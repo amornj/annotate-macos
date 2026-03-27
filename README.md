@@ -2,27 +2,65 @@
 
 Keyboard-driven macOS screen annotation app.
 
-This project is the standalone macOS evolution of the original Annotate Chrome extension, but the goal here is different:
-- annotate over **other macOS apps**, not just webpages
-- show a fullscreen transparent overlay
-- draw arrows, lines, boxes, circles, highlights, text, blackboards, and numbered callouts
-- save a composited screenshot of the captured screen + annotations
+## What this is now
+
+This repo is now a real macOS app project for annotating on top of other apps.
+
+Current architecture:
+- AppKit-based fullscreen overlay window
+- global hotkey: `Option+1` toggles overlay on/off
+- floating control panel for tool/color/width
+- Xcode project included: `AnnotateMac.xcodeproj`
 
 ## Current status
 
-Working prototype:
-- native Swift/AppKit app
-- fullscreen overlay window
-- keyboard-driven annotation tools
+Working in-progress prototype:
+- draw
+- arrow
+- line
+- square
+- circle
+- text
+- highlight
+- blackboard
+- numbered callout
+- color switching
+- width adjustment
 - screenshot save flow
-- first-pass screen capture integration
 
-## Run
+Still needs polish:
+- lag/performance optimization
+- multi-display support
+- better screenshot fidelity
+- signing/notarization for smooth distribution
+- more polished UI/UX
+
+## Build in Xcode
+
+Open:
+- `AnnotateMac.xcodeproj`
+
+Then build/run the `AnnotateMac` target.
+
+## Build from terminal
+
+Build release app:
 
 ```bash
-cd /Users/home/projects/annotate-macos
-swift run
+./scripts/build_app.sh
 ```
+
+Output:
+- `dist/AnnotateMac.app`
+
+Build DMG:
+
+```bash
+./scripts/make_dmg.sh
+```
+
+Output:
+- `dist/AnnotateMac.dmg`
 
 ## Shortcuts
 
@@ -45,11 +83,3 @@ swift run
 - `Cmd+Y` redo
 - `Cmd+A` select all
 - `Esc` exit panel
-
-## Notes
-
-This app is being adapted for true system-wide macOS annotation. Some polish is still needed for:
-- multi-display handling
-- accessibility / event routing edge cases
-- packaging/signing/notarization
-- perfect screenshot fidelity on every display setup

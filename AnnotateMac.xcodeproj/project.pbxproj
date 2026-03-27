@@ -1,0 +1,246 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+	A10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AppDelegate.swift */; };
+	A10000000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* main.swift */; };
+	A10000000000000000000003 /* AnnotationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* AnnotationOverlayView.swift */; };
+	A10000000000000000000004 /* OverlayChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* OverlayChrome.swift */; };
+	A10000000000000000000005 /* OverlayWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* OverlayWindowController.swift */; };
+	A10000000000000000000006 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* HotkeyManager.swift */; };
+	A10000000000000000000007 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* ScreenCapture.swift */; };
+	A10000000000000000000008 /* AnnotationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* AnnotationState.swift */; };
+	A10000000000000000000009 /* ControlPanelWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* ControlPanelWindowController.swift */; };
+	A1000000000000000000000A /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* AppKit.framework */; };
+	A1000000000000000000000B /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Carbon.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+	A20000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+	A20000000000000000000002 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+	A20000000000000000000003 /* AnnotationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationOverlayView.swift; sourceTree = "<group>"; };
+	A20000000000000000000004 /* OverlayChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayChrome.swift; sourceTree = "<group>"; };
+	A20000000000000000000005 /* OverlayWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayWindowController.swift; sourceTree = "<group>"; };
+	A20000000000000000000006 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+	A20000000000000000000007 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
+	A20000000000000000000008 /* AnnotationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationState.swift; sourceTree = "<group>"; };
+	A20000000000000000000009 /* ControlPanelWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlPanelWindowController.swift; sourceTree = "<group>"; };
+	A2000000000000000000000A /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+	A2000000000000000000000B /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+	A2000000000000000000000C /* AnnotateMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AnnotateMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+	A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+	A30000000000000000000001 /* Frameworks */ = {
+		isa = PBXFrameworksBuildPhase;
+		buildActionMask = 2147483647;
+		files = (
+			A1000000000000000000000A /* AppKit.framework in Frameworks */,
+			A1000000000000000000000B /* Carbon.framework in Frameworks */,
+		);
+		runOnlyForDeploymentPostprocessing = 0;
+	};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+	A40000000000000000000001 = {
+		isa = PBXGroup;
+		children = (
+			A40000000000000000000002 /* AnnotateMac */,
+			A40000000000000000000003 /* Frameworks */,
+			A40000000000000000000004 /* Products */,
+		);
+		sourceTree = "<group>";
+	};
+	A40000000000000000000002 /* AnnotateMac */ = {
+		isa = PBXGroup;
+		path = AnnotateMac;
+		sourceTree = "<group>";
+		children = (
+			A2000000000000000000000D /* Info.plist */,
+			A20000000000000000000001 /* AppDelegate.swift */,
+			A20000000000000000000002 /* main.swift */,
+			A20000000000000000000008 /* AnnotationState.swift */,
+			A20000000000000000000003 /* AnnotationOverlayView.swift */,
+			A20000000000000000000009 /* ControlPanelWindowController.swift */,
+			A20000000000000000000006 /* HotkeyManager.swift */,
+			A20000000000000000000004 /* OverlayChrome.swift */,
+			A20000000000000000000005 /* OverlayWindowController.swift */,
+			A20000000000000000000007 /* ScreenCapture.swift */,
+		);
+	};
+	A40000000000000000000003 /* Frameworks */ = {
+		isa = PBXGroup;
+		children = (
+			A2000000000000000000000A /* AppKit.framework */,
+			A2000000000000000000000B /* Carbon.framework */,
+		);
+		sourceTree = "<group>";
+	};
+	A40000000000000000000004 /* Products */ = {
+		isa = PBXGroup;
+		children = (
+			A2000000000000000000000C /* AnnotateMac.app */,
+		);
+		sourceTree = "<group>";
+	};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+	A50000000000000000000001 /* AnnotateMac */ = {
+		isa = PBXNativeTarget;
+		buildConfigurationList = A70000000000000000000001 /* Build configuration list for PBXNativeTarget "AnnotateMac" */;
+		buildPhases = (
+			A30000000000000000000002 /* Sources */,
+			A30000000000000000000001 /* Frameworks */,
+		);
+		buildRules = (
+		);
+		dependencies = (
+		);
+		name = AnnotateMac;
+		productName = AnnotateMac;
+		productReference = A2000000000000000000000C /* AnnotateMac.app */;
+		productType = "com.apple.product-type.application";
+	};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+	A60000000000000000000001 /* Project object */ = {
+		isa = PBXProject;
+		attributes = {
+			BuildIndependentTargetsInParallel = 1;
+			LastSwiftUpdateCheck = 2610;
+			LastUpgradeCheck = 2610;
+			TargetAttributes = {
+				A50000000000000000000001 = {
+					CreatedOnToolsVersion = 26.1.1;
+				};
+			};
+		};
+		buildConfigurationList = A70000000000000000000002 /* Build configuration list for PBXProject "AnnotateMac" */;
+		compatibilityVersion = "Xcode 14.0";
+		developmentRegion = en;
+		hasScannedForEncodings = 0;
+		knownRegions = (
+			en,
+			Base,
+		);
+		mainGroup = A40000000000000000000001;
+		productRefGroup = A40000000000000000000004 /* Products */;
+		projectDirPath = "";
+		projectRoot = "";
+		targets = (
+			A50000000000000000000001 /* AnnotateMac */,
+		);
+	};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+	A30000000000000000000002 /* Sources */ = {
+		isa = PBXSourcesBuildPhase;
+		buildActionMask = 2147483647;
+		files = (
+			A10000000000000000000001 /* AppDelegate.swift in Sources */,
+			A10000000000000000000002 /* main.swift in Sources */,
+			A10000000000000000000008 /* AnnotationState.swift in Sources */,
+			A10000000000000000000003 /* AnnotationOverlayView.swift in Sources */,
+			A10000000000000000000009 /* ControlPanelWindowController.swift in Sources */,
+			A10000000000000000000006 /* HotkeyManager.swift in Sources */,
+			A10000000000000000000004 /* OverlayChrome.swift in Sources */,
+			A10000000000000000000005 /* OverlayWindowController.swift in Sources */,
+			A10000000000000000000007 /* ScreenCapture.swift in Sources */,
+		);
+		runOnlyForDeploymentPostprocessing = 0;
+	};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+	A80000000000000000000001 /* Debug */ = {
+		isa = XCBuildConfiguration;
+		buildSettings = {
+			CLANG_ENABLE_MODULES = YES;
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			GENERATE_INFOPLIST_FILE = NO;
+			INFOPLIST_FILE = AnnotateMac/Info.plist;
+			LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+			MACOSX_DEPLOYMENT_TARGET = 13.0;
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = ai.amornj.annotatemac;
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = macosx;
+			SWIFT_VERSION = 5.0;
+			SWIFT_EMIT_LOC_STRINGS = NO;
+		};
+		name = Debug;
+	};
+	A80000000000000000000002 /* Release */ = {
+		isa = XCBuildConfiguration;
+		buildSettings = {
+			CLANG_ENABLE_MODULES = YES;
+			CODE_SIGN_STYLE = Automatic;
+			CURRENT_PROJECT_VERSION = 1;
+			GENERATE_INFOPLIST_FILE = NO;
+			INFOPLIST_FILE = AnnotateMac/Info.plist;
+			LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+			MACOSX_DEPLOYMENT_TARGET = 13.0;
+			MARKETING_VERSION = 0.1.0;
+			PRODUCT_BUNDLE_IDENTIFIER = ai.amornj.annotatemac;
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			SDKROOT = macosx;
+			SWIFT_VERSION = 5.0;
+			SWIFT_EMIT_LOC_STRINGS = NO;
+		};
+		name = Release;
+	};
+	A80000000000000000000003 /* Debug */ = {
+		isa = XCBuildConfiguration;
+		buildSettings = {
+			MACOSX_DEPLOYMENT_TARGET = 13.0;
+			SDKROOT = macosx;
+		};
+		name = Debug;
+	};
+	A80000000000000000000004 /* Release */ = {
+		isa = XCBuildConfiguration;
+		buildSettings = {
+			MACOSX_DEPLOYMENT_TARGET = 13.0;
+			SDKROOT = macosx;
+		};
+		name = Release;
+	};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+	A70000000000000000000001 /* Build configuration list for PBXNativeTarget "AnnotateMac" */ = {
+		isa = XCConfigurationList;
+		buildConfigurations = (
+			A80000000000000000000001 /* Debug */,
+			A80000000000000000000002 /* Release */,
+		);
+		defaultConfigurationIsVisible = 0;
+		defaultConfigurationName = Release;
+	};
+	A70000000000000000000002 /* Build configuration list for PBXProject "AnnotateMac" */ = {
+		isa = XCConfigurationList;
+		buildConfigurations = (
+			A80000000000000000000003 /* Debug */,
+			A80000000000000000000004 /* Release */,
+		);
+		defaultConfigurationIsVisible = 0;
+		defaultConfigurationName = Release;
+	};
+/* End XCConfigurationList section */
+	};
+	rootObject = A60000000000000000000001 /* Project object */;
+}
