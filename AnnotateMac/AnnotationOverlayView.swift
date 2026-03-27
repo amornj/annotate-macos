@@ -19,6 +19,7 @@ final class AnnotationOverlayView: NSView {
     private var indicatorMoved = false
     private var exitPanel: ExitPanelView?
     private var selectHint: NSTextField?
+    private var localMonitor: Any?
 
     // --- Cached rendering: separates committed actions from live preview ---
     private var committedCache: NSImage?
@@ -60,7 +61,34 @@ final class AnnotationOverlayView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        window?.makeFirstResponder(self)
+        if window != nil {
+            // Ensure the overlay view becomes first responder when added to window.
+            window?.makeFirstResponder(self)
+            // Set up a local event monitor so keyDown events that arrive at the app
+            // (even if another app's window is momentarily key) are routed here.
+            setupLocalEventMonitor()
+        }
+    }
+
+    private func setupLocalEventMonitor() {
+        // Remove any existing monitor first.
+        if let monitor = localMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMonitor = nil
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.window?.isVisible == true else { return event }
+            // Route the event to this view's keyDown handler.
+            self.keyDown(with: event)
+            return nil  // Consume the event — we handled it.
+        }
+    }
+
+    private func removeLocalEventMonitor() {
+        if let monitor = localMonitor {
+            NSEvent.removeMonitor(monitor)
+            localMonitor = nil
+        }
     }
 
     private func setupIndicator() {
@@ -101,6 +129,7 @@ final class AnnotationOverlayView: NSView {
     }
 
     func hideIndicator() {
+        commitTextIfNeeded()
         indicatorView.isHidden = true
     }
 
@@ -282,6 +311,10 @@ final class AnnotationOverlayView: NSView {
         committedCache = nil
     }
 
+    deinit {
+        removeLocalEventMonitor()
+    }
+
     // MARK: - Mouse events
 
     override func mouseDown(with event: NSEvent) {
@@ -345,7 +378,10 @@ final class AnnotationOverlayView: NSView {
     // MARK: - Keyboard events
 
     override func keyDown(with event: NSEvent) {
-        if let field = activeTextField, window?.firstResponder === field.currentEditor() {
+        // If a text field is active, let it (or its editor) handle all input.
+        // We check field.acceptsFirstResponder because the field's editor is lazily
+        // created — during the transition the firstResponder IS the field itself.
+        if let field = activeTextField, field.acceptsFirstResponder {
             super.keyDown(with: event)
             return
         }
@@ -429,6 +465,11 @@ final class AnnotationOverlayView: NSView {
 
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
+
+        // Ensure the overlay window is key so keyboard input goes to the text field.
+        window?.makeKey()
+        window?.makeFirstResponder(self)
+
         let textH = max(24, state.fontSize * 1.5)
         let field = NSTextField(frame: NSRect(
             x: point.x - 4,
@@ -456,6 +497,10 @@ final class AnnotationOverlayView: NSView {
         let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty {
             state.add(.text(text: text, x: field.frame.minX, y: field.frame.minY, fontSize: state.fontSize, color: state.color))
+        }
+        // Properly resign first responder so the overlay regains it.
+        if field.window?.firstResponder === field || field.window?.firstResponder === field.currentEditor() {
+            field.window?.makeFirstResponder(self)
         }
         field.removeFromSuperview()
         activeTextField = nil

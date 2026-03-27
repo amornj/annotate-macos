@@ -31,6 +31,9 @@ final class OverlayWindowController: NSWindowController {
     func begin() {
         self.showWindow(self)
         self.window?.makeKeyAndOrderFront(nil)
+        // Force the window to become key — essential for keyboard shortcuts to work.
+        // makeKeyAndOrderFront alone is not always sufficient in a multi-app environment.
+        self.window?.makeKey()
         self.window?.makeFirstResponder(self.overlayView)
         overlayView.showIndicator()
         NSApp.activate(ignoringOtherApps: true)
