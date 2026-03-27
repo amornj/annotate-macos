@@ -1,0 +1,298 @@
+/* Annotate extension — all elements scoped under #annotate-root */
+
+#annotate-root {
+  all: initial;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2147483647;
+  cursor: crosshair;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: #fff;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+#annotate-root * {
+  box-sizing: border-box;
+}
+
+#annotate-canvas {
+  all: initial;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+/* Floating tool indicator */
+#annotate-indicator {
+  all: initial;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  background: rgba(30, 30, 30, 0.9);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 2147483647;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#annotate-indicator:active {
+  cursor: grabbing;
+}
+
+#annotate-indicator svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Color + width ring on indicator — border and glow scale with --annotate-width */
+#annotate-indicator::after {
+  content: "";
+  position: absolute;
+  inset: calc(-2px - var(--annotate-width, 3) * 0.3px);
+  border-radius: calc(12px + var(--annotate-width, 3) * 0.3px);
+  border: calc(1.5px + var(--annotate-width, 3) * 0.15px) solid var(--annotate-color, #ff0000);
+  box-shadow: 0 0 calc(var(--annotate-width, 3) * 0.8px) calc(var(--annotate-width, 3) * 0.3px) var(--annotate-color, #ff0000);
+  pointer-events: none;
+  transition: all 0.15s ease;
+}
+
+/* Help popup */
+#annotate-help {
+  all: initial;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
+#annotate-help-box {
+  all: initial;
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.5;
+  min-width: 220px;
+}
+
+.annotate-help-title {
+  all: initial;
+  display: block;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.annotate-help-table {
+  all: initial;
+  display: table;
+  font-family: inherit;
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.5;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.annotate-help-table th {
+  all: initial;
+  display: table-cell;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 0 4px;
+  line-height: 1.5;
+}
+
+.annotate-help-table tr {
+  all: initial;
+  display: table-row;
+}
+
+.annotate-help-table td {
+  all: initial;
+  display: table-cell;
+  font-family: inherit;
+  font-size: 13px;
+  color: #e0e0e0;
+  padding: 3px 0;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.annotate-help-table td:first-child {
+  padding-right: 16px;
+  white-space: nowrap;
+}
+
+.annotate-help-table kbd {
+  all: initial;
+  display: inline-block;
+  font-family: inherit;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.6;
+}
+
+.annotate-swatch {
+  all: initial;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.annotate-help-hint {
+  all: initial;
+  display: block;
+  font-family: inherit;
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* Text input (contenteditable div) */
+#annotate-root .annotate-text-input {
+  all: initial;
+  position: absolute;
+  min-width: 2px;
+  min-height: 1em;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid rgba(128, 128, 128, 0.6);
+  outline: none;
+  color: var(--annotate-color, #ff0000);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--annotate-font-size, 18px);
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  z-index: 2147483647;
+}
+
+/* Exit dialog — compact floating card at bottom-right */
+#annotate-dialog {
+  all: initial;
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.4;
+  min-width: 160px;
+}
+
+#annotate-dialog p {
+  all: initial;
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.annotate-dialog-btns {
+  all: initial;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#annotate-dialog button {
+  all: initial;
+  display: inline-block;
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.4;
+}
+
+#annotate-dialog .annotate-btn-yes {
+  background: #2563eb;
+  color: #fff;
+}
+
+#annotate-dialog .annotate-btn-yes:hover {
+  background: #1d4ed8;
+}
+
+#annotate-dialog .annotate-btn-no {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e0e0e0;
+}
+
+#annotate-dialog .annotate-btn-no:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.annotate-dialog-countdown {
+  all: initial;
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+  line-height: 1.4;
+}

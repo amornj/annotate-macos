@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annotate — Privacy Policy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+
+    .back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #888;
+      text-decoration: none;
+      margin-bottom: 32px;
+    }
+
+    .back:hover { color: #fff; }
+
+    .back svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .effective {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      margin: 28px 0 10px;
+    }
+
+    h2:first-of-type { margin-top: 0; }
+
+    p { margin-bottom: 12px; color: #bbb; }
+
+    ul {
+      margin: 0 0 12px 20px;
+      color: #bbb;
+    }
+
+    li { margin-bottom: 6px; }
+
+    strong { color: #fff; font-weight: 600; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #ccc;
+    }
+
+    code {
+      font-size: 13px;
+      background: rgba(255,255,255,0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    a { color: #5b9cf5; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="docs.html" class="back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
+
+    <h1>Privacy Policy</h1>
+    <p class="effective">Effective date: February 12, 2026</p>
+
+    <h2>Overview</h2>
+    <p>Annotate is a screen annotation Chrome extension. Your privacy is important — this extension is designed to operate entirely on your device with no data collection.</p>
+
+    <h2>Data Collection</h2>
+    <p>Annotate does <strong>not</strong> collect, store, transmit, or share any personal data or browsing information.</p>
+    <p>Specifically, the extension:</p>
+    <ul>
+      <li>Does <strong>not</strong> track your browsing history or activity</li>
+      <li>Does <strong>not</strong> collect any personal information</li>
+      <li>Does <strong>not</strong> send any data to external servers</li>
+      <li>Does <strong>not</strong> use analytics, cookies, or tracking technologies</li>
+      <li>Does <strong>not</strong> store any data beyond the current annotation session</li>
+    </ul>
+
+    <h2>Permissions</h2>
+    <p>The extension requests the following Chrome permissions:</p>
+    <table>
+      <tr><th>Permission</th><th>Purpose</th></tr>
+      <tr><td><code>activeTab</code></td><td>Access the current tab to overlay the annotation canvas and capture a screenshot when you choose to save</td></tr>
+      <tr><td><code>scripting</code></td><td>Inject the annotation interface into the current page when you click the extension icon</td></tr>
+    </table>
+    <p>These permissions are used <strong>only</strong> when you actively click the extension icon. No background data access occurs.</p>
+
+    <h2>Screenshots</h2>
+    <p>When you choose to save a screenshot:</p>
+    <ul>
+      <li>The image is saved locally to your device (downloads folder)</li>
+      <li>The image is copied to your local clipboard</li>
+      <li>No image data is uploaded or transmitted anywhere</li>
+    </ul>
+
+    <h2>Third-Party Services</h2>
+    <p>Annotate does not use any third-party services, SDKs, or libraries. It is built entirely with vanilla JavaScript with zero external dependencies.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>If this privacy policy is updated, the changes will be posted on this page with an updated effective date.</p>
+
+    <h2>Contact</h2>
+    <p>If you have questions about this privacy policy, please open an issue on the <a href="https://github.com/amornj/screen-annotator/issues">GitHub repository</a>.</p>
+
+    <div class="footer">
+      <a href="https://github.com/amornj/screen-annotator">GitHub</a>
+    </div>
+  </div>
+</body>
+</html>
