@@ -29,6 +29,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
+    /// Called when the user clicks the Dock icon.
+    /// Shows the annotation UI (overlay + floating tile) without needing Option+1.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if let controller = overlayController, controller.window?.isVisible == true {
+            // Already visible — just bring to front
+            controller.window?.orderFront(nil)
+        } else {
+            // Show overlay + floating tile
+            toggleOverlay()
+        }
+        return true
+    }
+
     private func toggleOverlay() {
         guard !isToggling else { return }
         isToggling = true

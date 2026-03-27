@@ -61,6 +61,9 @@ final class AnnotationOverlayView: NSView {
     }
 
     private func setupIndicator() {
+        // Place tile at bottom-right, matching Chrome extension's #annotate-indicator position
+        positionIndicator()
+
         indicatorView.onMouseDown = { [weak self] point in
             guard let self else { return }
             self.wasDrawingBeforeIndicatorDrag = self.isDrawing
@@ -72,9 +75,34 @@ final class AnnotationOverlayView: NSView {
         indicatorView.onMouseUp = { [weak self] in
             guard let self else { return }
             defer { self.isDraggingIndicator = false }
-            if !self.indicatorMoved { self.showHelpPanel() }
+            if !self.indicatorMoved {
+                // Clicking the tile itself shows the keyboard help popup
+                self.showHelpPanel()
+            }
         }
         addSubview(indicatorView)
+    }
+
+    private func positionIndicator() {
+        // Position at bottom-right, 24px from edges (matches Chrome extension)
+        let tileSize: CGFloat = 44
+        let margin: CGFloat = 24
+        indicatorView.frame = NSRect(
+            x: bounds.width - tileSize - margin,
+            y: margin,
+            width: tileSize,
+            height: tileSize
+        )
+        indicatorView.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+    }
+
+    func showIndicator() {
+        indicatorView.isHidden = false
+        positionIndicator()
+    }
+
+    func hideIndicator() {
+        indicatorView.isHidden = true
     }
 
     func compositeImage(with background: NSImage?) -> NSImage? {
@@ -176,7 +204,7 @@ final class AnnotationOverlayView: NSView {
             let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
             ctx.fill(rect)
         case let .blackboard(x1, y1, x2, y2):
-            ctx.setFillColor(NSColor(calibratedWhite: 0.1, alpha: 0.95).cgColor)
+            ctx.setFillColor(NSColor(calibratedWhite: 0.1, alpha: 0.65).cgColor)
             let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
             ctx.fill(rect)
         case let .callout(x, y, n, color, radius):
@@ -410,7 +438,17 @@ final class AnnotationOverlayView: NSView {
 
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
-        let field = NSTextField(frame: NSRect(x: point.x - 5, y: point.y - state.fontSize * 0.7, width: 220, height: max(32, state.fontSize * 1.8)))
+        // Center the text vertically at the clicked point.
+        // AppKit renders text with baseline at the top of the font box,
+        // so we offset by fontSize/2 to put the vertical midpoint of the
+        // first letter's cap-height at the click point.
+        let textH = max(24, state.fontSize * 1.5)
+        let field = NSTextField(frame: NSRect(
+            x: point.x - 4,
+            y: point.y - textH / 2,
+            width: 240,
+            height: textH
+        ))
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -420,6 +458,8 @@ final class AnnotationOverlayView: NSView {
         field.isBezeled = false
         field.stringValue = ""
         field.delegate = self
+        // Allow multi-line input
+        field.maximumNumberOfLines = 0
         addSubview(field)
         window?.makeFirstResponder(field)
         activeTextField = field
@@ -489,14 +529,31 @@ final class AnnotationOverlayView: NSView {
     }
 
     private func showExitPanel() {
-        if exitPanel != nil {
-            exitPanel?.removeFromSuperview()
-            exitPanel = nil
-            return
+        // Remove any existing panel first
+        exitPanel?.removeFromSuperview()
+        exitPanel = nil
+
+        // Show Esc confirmation panel at bottom-right (next to the floating tile)
+        let panel = ExitPanelView(frame: NSRect(
+            x: bounds.width - 200 - 24,
+            y: 24,
+            width: 180,
+            height: 92
+        ))
+        panel.onSave = { [weak self] in
+            self?.exitPanel?.removeFromSuperview()
+            self?.exitPanel = nil
         }
-        let panel = ExitPanelView(frame: NSRect(x: bounds.width - 220, y: 80, width: 180, height: 92))
-        panel.onSave = { [weak self] in self?.onSaveRequested?() }
-        panel.onExit = { [weak self] in self?.onExitRequested?() }
+        panel.onExit = { [weak self] in
+            // Hide the floating tile first
+            self?.indicatorView.isHidden = true
+            self?.exitPanel?.removeFromSuperview()
+            self?.exitPanel = nil
+            // Brief delay so the hide takes effect before closing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.onExitRequested?()
+            }
+        }
         addSubview(panel)
         exitPanel = panel
     }
@@ -505,7 +562,16 @@ final class AnnotationOverlayView: NSView {
 extension AnnotationOverlayView: NSTextFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+            // Shift+Enter → insert newline (let the field handle it)
+            if NSEvent.modifierFlags.contains(.shift) {
+                return false
+            }
+            // Enter → commit text and exit text mode
             commitTextIfNeeded()
+            // Exit text mode: revert tool to draw
+            state.tool = .draw
+            updateIndicator()
+            needsDisplay = true
             return true
         }
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {

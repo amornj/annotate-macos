@@ -32,6 +32,8 @@ final class OverlayWindowController: NSWindowController {
         self.showWindow(self)
         self.window?.makeKeyAndOrderFront(nil)
         self.window?.makeFirstResponder(self.overlayView)
+        // Show the floating tile indicator and position it
+        overlayView.showIndicator()
         // Also bring the floating control panel to front so it's visible.
         if let panel = self.panelController {
             panel.showWindow(self)
@@ -67,6 +69,7 @@ final class OverlayWindowController: NSWindowController {
     }
 
     private func closeOverlay() {
+        overlayView.hideIndicator()
         close()
     }
 }
