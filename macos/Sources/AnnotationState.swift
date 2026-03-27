@@ -2,7 +2,7 @@ import AppKit
 
 final class AnnotationState {
     enum Tool: String, CaseIterable {
-        case draw, arrow, line, square, circle, text, highlight, blackboard, callout
+        case draw, arrow, line, square, circle, text, callout
 
         var displayName: String {
             switch self {
@@ -12,11 +12,16 @@ final class AnnotationState {
             case .square: return "Square"
             case .circle: return "Circle"
             case .text: return "Text"
-            case .highlight: return "Highlight"
-            case .blackboard: return "Blackboard"
             case .callout: return "Callout"
             }
         }
+    }
+
+    /// Background mode for whiteboard / blackboard overlay
+    enum BackgroundMode: String {
+        case none
+        case whiteboard  // solid white background
+        case blackboard   // solid dark background
     }
 
     struct StrokePoint {
@@ -31,12 +36,11 @@ final class AnnotationState {
         case square(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
         case circle(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
         case text(text: String, x: CGFloat, y: CGFloat, fontSize: CGFloat, color: NSColor)
-        case highlight(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor)
-        case blackboard(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat)
         case callout(x: CGFloat, y: CGFloat, n: Int, color: NSColor, radius: CGFloat)
     }
 
     var tool: Tool = .draw { didSet { notifyPreviewChange() } }
+    var backgroundMode: BackgroundMode = .none { didSet { notifyBackgroundChange() } }
     var color: NSColor = .systemRed { didSet { persist(); notifyPreviewChange() } }
     var lineWidth: CGFloat = 3 { didSet { persist(); notifyPreviewChange() } }
     var fontSize: CGFloat = 18 { didSet { notifyPreviewChange() } }
@@ -113,6 +117,10 @@ final class AnnotationState {
     /// Called for preview-only changes (tool, color, width, fontSize).
     /// Does NOT increment committedVersion — no cache rebuild needed.
     private func notifyPreviewChange() {
+        onChange?()
+    }
+
+    private func notifyBackgroundChange() {
         onChange?()
     }
 

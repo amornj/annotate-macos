@@ -1,16 +1,13 @@
 import AppKit
 
-// MARK: - Minimal Floating Tile (matches original Chrome extension spirit)
+// MARK: - Tool Indicator View (floating tile)
 
 final class ToolIndicatorView: NSView {
-    var tool: AnnotationState.Tool = .draw { didSet { needsDisplay = true } }
+    var tool: AnnotationState.Tool = .draw { didSet { needsDisplay = true; updateGlow() } }
     var color: NSColor = .systemRed { didSet { needsDisplay = true; updateGlow() } }
     var weight: CGFloat = 3 { didSet { needsDisplay = true; updateGlow() } }
     var onMouseDown: ((CGPoint) -> Void)?
     var onMouseUp: (() -> Void)?
-
-    /// Called when the tile itself is clicked (not dragged).
-    var onTileClicked: (() -> Void)?
 
     private var glowLayer: CALayer!
 
@@ -25,7 +22,6 @@ final class ToolIndicatorView: NSView {
     }
 
     private func setupGlow() {
-        // Outer glow ring layer (drawn behind the main rounded rect)
         glowLayer = CALayer()
         glowLayer.zPosition = -1
         layer?.addSublayer(glowLayer)
@@ -41,11 +37,10 @@ final class ToolIndicatorView: NSView {
         glowLayer.cornerRadius = cornerRadius
         glowLayer.borderWidth = max(1.5, 1.5 + weight * 0.15)
         glowLayer.borderColor = color.cgColor
-        // Shadow with the annotation color
-        layer?.shadowColor = color.cgColor
-        layer?.shadowRadius = max(2, weight * 0.8)
-        layer?.shadowOffset = .zero
-        layer?.shadowOpacity = 0.6
+        layer.shadowColor = color.cgColor
+        layer.shadowRadius = max(2, weight * 0.8)
+        layer.shadowOffset = .zero
+        layer.shadowOpacity = 0.6
     }
 
     override func layout() {
@@ -64,16 +59,23 @@ final class ToolIndicatorView: NSView {
     }
 
     private func drawGlyph(in rect: NSRect) {
-        // Draw glyph in the annotation color so the whole tile is monochromatic
         color.setStroke()
         color.setFill()
         let path = NSBezierPath()
-        path.lineWidth = 2
+
         switch tool {
         case .draw:
-            path.move(to: CGPoint(x: rect.minX + 10, y: rect.maxY - 10))
-            path.line(to: CGPoint(x: rect.maxX - 10, y: rect.minY + 10))
+            // Wavy line (bezier curve) — visually distinct from straight Line tool
+            let p0 = CGPoint(x: rect.minX + 8, y: rect.midY)
+            let p1 = CGPoint(x: rect.minX + 16, y: rect.midY + 8)
+            let p3 = CGPoint(x: rect.maxX - 16, y: rect.midY + 8)
+            let p4 = CGPoint(x: rect.maxX - 8, y: rect.midY)
+            path.move(to: p0)
+            path.curve(to: p4, controlPoint1: p1, controlPoint2: p3)
+            color.setStroke()
+            path.lineWidth = 2
             path.stroke()
+
         case .arrow:
             path.move(to: CGPoint(x: rect.minX + 10, y: rect.maxY - 10))
             path.line(to: CGPoint(x: rect.maxX - 10, y: rect.minY + 10))
@@ -81,30 +83,27 @@ final class ToolIndicatorView: NSView {
             path.move(to: CGPoint(x: rect.maxX - 10, y: rect.minY + 10))
             path.line(to: CGPoint(x: rect.maxX - 10, y: rect.minY + 18))
             path.stroke()
+
         case .line:
+            path.lineWidth = 2
             path.move(to: CGPoint(x: rect.minX + 10, y: rect.maxY - 10))
             path.line(to: CGPoint(x: rect.maxX - 10, y: rect.minY + 10))
             path.stroke()
+
         case .square:
+            path.lineWidth = 2
             path.appendRect(NSRect(x: rect.minX + 9, y: rect.minY + 9, width: rect.width - 18, height: rect.height - 18))
             path.stroke()
+
         case .circle:
+            path.lineWidth = 2
             path.appendOval(in: NSRect(x: rect.minX + 8, y: rect.minY + 10, width: rect.width - 16, height: rect.height - 20))
             path.stroke()
+
         case .text:
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 17), .foregroundColor: color]
             NSString(string: "T").draw(at: CGPoint(x: rect.midX - 5, y: rect.midY - 10), withAttributes: attrs)
-        case .highlight:
-            color.withAlphaComponent(0.35).setFill()
-            NSBezierPath(roundedRect: NSRect(x: rect.minX + 7, y: rect.midY - 5, width: rect.width - 14, height: 10), xRadius: 2, yRadius: 2).fill()
-        case .blackboard:
-            color.setStroke()
-            let r = NSRect(x: rect.minX + 8, y: rect.minY + 8, width: rect.width - 16, height: rect.height - 16)
-            NSBezierPath(rect: r).stroke()
-            let slash = NSBezierPath()
-            slash.move(to: CGPoint(x: r.minX, y: r.maxY))
-            slash.line(to: CGPoint(x: r.maxX, y: r.minY))
-            slash.stroke()
+
         case .callout:
             color.setStroke(); color.setFill()
             let circle = NSBezierPath(ovalIn: NSRect(x: rect.midX - 9, y: rect.midY - 9, width: 18, height: 18))

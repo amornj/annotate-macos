@@ -24,7 +24,7 @@ final class AnnotationOverlayView: NSView {
     private var committedCache: NSImage?
     private var lastCommittedVersion: Int = 0
 
-    /// Shared color palette — must match ControlPanelWindowController exactly
+    /// Shared color palette
     private static let sharedColors: [NSColor] = [
         .systemRed,
         .systemBlue,
@@ -41,9 +41,12 @@ final class AnnotationOverlayView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         postsFrameChangedNotifications = true
         setupIndicator()
-        // Track committed action changes separately from preview-only changes
         state.onActionListChange = { [weak self] in
             self?.invalidateCache()
+            self?.needsDisplay = true
+        }
+        state.onChange = { [weak self] in
+            self?.updateIndicator()
             self?.needsDisplay = true
         }
         updateIndicator()
@@ -61,9 +64,7 @@ final class AnnotationOverlayView: NSView {
     }
 
     private func setupIndicator() {
-        // Place tile at bottom-right, matching Chrome extension's #annotate-indicator position
         positionIndicator()
-
         indicatorView.onMouseDown = { [weak self] point in
             guard let self else { return }
             self.wasDrawingBeforeIndicatorDrag = self.isDrawing
@@ -76,7 +77,6 @@ final class AnnotationOverlayView: NSView {
             guard let self else { return }
             defer { self.isDraggingIndicator = false }
             if !self.indicatorMoved {
-                // Clicking the tile itself shows the keyboard help popup
                 self.showHelpPanel()
             }
         }
@@ -84,7 +84,6 @@ final class AnnotationOverlayView: NSView {
     }
 
     private func positionIndicator() {
-        // Position at bottom-right, 24px from edges (matches Chrome extension)
         let tileSize: CGFloat = 44
         let margin: CGFloat = 24
         indicatorView.frame = NSRect(
@@ -108,13 +107,19 @@ final class AnnotationOverlayView: NSView {
     func compositeImage(with background: NSImage?) -> NSImage? {
         let image = NSImage(size: bounds.size)
         image.lockFocus()
-        background?.draw(in: bounds)
+        // In whiteboard/blackboard mode: fill background first, then draw annotations on top.
+        // In normal mode: draw captured screenshot as base, then annotations on top.
+        if state.backgroundMode != .none {
+            if let ctx = NSGraphicsContext.current?.cgContext {
+                drawBackground(in: ctx)
+            }
+        } else {
+            background?.draw(in: bounds)
+        }
         if let ctx = NSGraphicsContext.current?.cgContext {
-            // Render committed actions
             for action in state.actions {
                 renderAction(action, in: ctx)
             }
-            // Also include any in-progress stroke (live preview) so saves capture what you see
             if isDrawing, state.tool == .draw, currentPath.count >= 1 {
                 renderDrawStroke(currentPath, color: state.color, lineWidth: state.lineWidth, in: ctx)
             }
@@ -130,24 +135,41 @@ final class AnnotationOverlayView: NSView {
         super.draw(dirtyRect)
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
-        // Step 1: rebuild committed cache if stale (only committed actions, not live preview)
-        // Also rebuild whenever the cache is nil as a safety net.
+        // Step 1: Fill background if whiteboard/blackboard mode active
+        drawBackground(in: ctx)
+
+        // Step 2: rebuild committed cache if stale
         if state.committedVersion != lastCommittedVersion || committedCache == nil {
             committedCache = nil
             committedCache = renderCommittedActions()
             lastCommittedVersion = state.committedVersion
         }
 
-        // Step 2: draw cached committed actions (cheap — single blit)
+        // Step 3: draw cached committed actions
         if let cache = committedCache {
             cache.draw(in: bounds)
         }
 
-        // Step 3: draw live preview on top (current stroke + select overlay)
+        // Step 4: draw live preview on top
         drawPreview(in: ctx)
 
         if allSelected && state.hasActions() {
             ctx.setFillColor(NSColor.systemBlue.withAlphaComponent(0.12).cgColor)
+            ctx.fill(bounds)
+        }
+    }
+
+    /// Draws the whiteboard or blackboard background fill.
+    private func drawBackground(in ctx: CGContext?) {
+        guard let ctx else { return }
+        switch state.backgroundMode {
+        case .none:
+            break
+        case .whiteboard:
+            ctx.setFillColor(NSColor.white.cgColor)
+            ctx.fill(bounds)
+        case .blackboard:
+            ctx.setFillColor(NSColor(calibratedWhite: 0.08, alpha: 1.0).cgColor)
             ctx.fill(bounds)
         }
     }
@@ -167,11 +189,9 @@ final class AnnotationOverlayView: NSView {
 
     /// Draws only the in-progress preview (current drag stroke) on top of the cache.
     private func drawPreview(in ctx: CGContext) {
-        // Freehand drawing: render accumulated points as a live stroke
         if isDrawing, state.tool == .draw, currentPath.count >= 1 {
             renderDrawStroke(currentPath, color: state.color, lineWidth: state.lineWidth, in: ctx)
         }
-        // Other tools: render preview shape from drag start to current position
         if isDrawing, let start = dragStart, let current = dragCurrent {
             renderShapePreview(from: start, to: current, in: ctx)
         }
@@ -199,14 +219,6 @@ final class AnnotationOverlayView: NSView {
         case let .text(text, x, y, fontSize, color):
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: fontSize), .foregroundColor: color]
             NSString(string: text).draw(at: CGPoint(x: x, y: y), withAttributes: attrs)
-        case let .highlight(x1, y1, x2, y2, color):
-            ctx.setFillColor(color.withAlphaComponent(0.35).cgColor)
-            let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
-            ctx.fill(rect)
-        case let .blackboard(x1, y1, x2, y2):
-            ctx.setFillColor(NSColor(calibratedWhite: 0.1, alpha: 0.65).cgColor)
-            let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
-            ctx.fill(rect)
         case let .callout(x, y, n, color, radius):
             ctx.setFillColor(color.cgColor)
             ctx.fillEllipse(in: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2))
@@ -245,8 +257,6 @@ final class AnnotationOverlayView: NSView {
         case .line: renderAction(.line(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
         case .square: renderAction(.square(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
         case .circle: renderAction(.circle(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .highlight: renderAction(.highlight(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color), in: ctx)
-        case .blackboard: renderAction(.blackboard(x1: start.x, y1: start.y, x2: end.x, y2: end.y), in: ctx)
         case .text, .callout: break
         }
     }
@@ -270,8 +280,6 @@ final class AnnotationOverlayView: NSView {
 
     private func invalidateCache() {
         committedCache = nil
-        // Do NOT update lastCommittedVersion here — leave it stale so the
-        // version check in draw() triggers a cache rebuild on the next call.
     }
 
     // MARK: - Mouse events
@@ -326,21 +334,17 @@ final class AnnotationOverlayView: NSView {
             if points.count == 1 { points.append(points[0]) }
             state.add(.draw(points: points, color: state.color, lineWidth: state.lineWidth))
         case .arrow:  state.add(.arrow(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
-        case .line:    state.add(.line(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
+        case .line:   state.add(.line(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .square: state.add(.square(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .circle: state.add(.circle(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
-        case .highlight: state.add(.highlight(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color))
-        case .blackboard: state.add(.blackboard(x1: start.x, y1: start.y, x2: location.x, y2: location.y))
         case .text, .callout: break
         }
-        // state.add() already called invalidateCache() via onActionListChange
         needsDisplay = true
     }
 
     // MARK: - Keyboard events
 
     override func keyDown(with event: NSEvent) {
-        // Route to active text field first
         if let field = activeTextField, window?.firstResponder === field.currentEditor() {
             super.keyDown(with: event)
             return
@@ -351,13 +355,13 @@ final class AnnotationOverlayView: NSView {
         let hasShift = event.modifierFlags.contains(.shift)
         let hasOpt  = event.modifierFlags.contains(.option)
 
-        // Option+1: toggle overlay (fallback if global hotkey missed it)
+        // Option+1: toggle overlay
         if hasOpt && chars == "1" && !hasCmd {
             onToggleRequested?()
             return
         }
 
-        // ⌘A — select all (only if there are actions)
+        // ⌘A — select all
         if hasCmd && chars == "a" {
             if state.hasActions() { enterSelectAll() }
             return
@@ -392,9 +396,9 @@ final class AnnotationOverlayView: NSView {
             case "s": state.tool = .square
             case "c": state.tool = .circle
             case "f": state.tool = .text
-            case "h": state.tool = .highlight
-            case "b": state.tool = .blackboard
             case "n": state.tool = .callout
+            case "w": state.backgroundMode = .whiteboard; state.tool = .draw
+            case "b": state.backgroundMode = .blackboard; state.tool = .draw
             case "1": state.color = Self.sharedColors[0]
             case "2": state.color = Self.sharedColors[1]
             case "3": state.color = Self.sharedColors[2]
@@ -415,19 +419,6 @@ final class AnnotationOverlayView: NSView {
         super.keyDown(with: event)
     }
 
-    // Also handle Option+1 via flagsChanged as a belt-and-suspenders approach
-    override func flagsChanged(with event: NSEvent) {
-        // If Option key is held on its own (no cmd, no ctrl), treat as toggle shortcut
-        let hasOpt  = event.modifierFlags.contains(.option)
-        let hasCmd  = event.modifierFlags.contains(.command)
-        let hasCtrl = event.modifierFlags.contains(.control)
-        if hasOpt && !hasCmd && !hasCtrl {
-            // Check if the 1 key was just pressed alongside Option
-            // flagsChanged doesn't give us the key char, so we rely on keyDown for the actual toggle
-        }
-        super.flagsChanged(with: event)
-    }
-
     private func updateIndicator() {
         indicatorView.tool = state.tool
         indicatorView.color = state.color
@@ -438,10 +429,6 @@ final class AnnotationOverlayView: NSView {
 
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
-        // Center the text vertically at the clicked point.
-        // AppKit renders text with baseline at the top of the font box,
-        // so we offset by fontSize/2 to put the vertical midpoint of the
-        // first letter's cap-height at the click point.
         let textH = max(24, state.fontSize * 1.5)
         let field = NSTextField(frame: NSRect(
             x: point.x - 4,
@@ -458,7 +445,6 @@ final class AnnotationOverlayView: NSView {
         field.isBezeled = false
         field.stringValue = ""
         field.delegate = self
-        // Allow multi-line input
         field.maximumNumberOfLines = 0
         addSubview(field)
         window?.makeFirstResponder(field)
@@ -518,40 +504,34 @@ final class AnnotationOverlayView: NSView {
         alert.informativeText = """
         Option+1: toggle overlay on/off
         D draw  A arrow  L line  S square  C circle
-        H highlight  B blackboard  F text  N callout
+        W whiteboard  B blackboard  F text  N callout
         1-6: colors (red, blue, green, yellow, light grey, dark grey)
         R/E: increase/decrease line width or font size
         ⌘Z undo  ⌘Y redo  ⌘A select all
-        Esc: exit panel
+        Esc: exit
         """
         alert.addButton(withTitle: "OK")
         alert.beginSheetModal(for: window!)
     }
 
     private func showExitPanel() {
-        // Remove any existing panel first
         exitPanel?.removeFromSuperview()
         exitPanel = nil
 
-        // Show Esc confirmation panel at bottom-right (next to the floating tile)
         let panel = ExitPanelView(frame: NSRect(
             x: bounds.width - 200 - 24,
             y: 24,
             width: 180,
             height: 92
         ))
-        panel.onSave = { [weak self] in
-            self?.exitPanel?.removeFromSuperview()
-            self?.exitPanel = nil
-        }
         panel.onExit = { [weak self] in
-            // Hide the floating tile first
-            self?.indicatorView.isHidden = true
             self?.exitPanel?.removeFromSuperview()
             self?.exitPanel = nil
-            // Brief delay so the hide takes effect before closing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self?.onExitRequested?()
+            // Erase all annotations and exit the app entirely
+            self?.state.clear()
+            self?.indicatorView.isHidden = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NSApp.terminate(nil)
             }
         }
         addSubview(panel)
@@ -562,13 +542,10 @@ final class AnnotationOverlayView: NSView {
 extension AnnotationOverlayView: NSTextFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            // Shift+Enter → insert newline (let the field handle it)
             if NSEvent.modifierFlags.contains(.shift) {
                 return false
             }
-            // Enter → commit text and exit text mode
             commitTextIfNeeded()
-            // Exit text mode: revert tool to draw
             state.tool = .draw
             updateIndicator()
             needsDisplay = true

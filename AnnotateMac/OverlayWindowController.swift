@@ -32,20 +32,13 @@ final class OverlayWindowController: NSWindowController {
         self.showWindow(self)
         self.window?.makeKeyAndOrderFront(nil)
         self.window?.makeFirstResponder(self.overlayView)
-        // Also bring the floating control panel to front so it's visible.
-        if let panel = self.panelController {
-            panel.showWindow(self)
-            panel.window?.orderFront(nil)
-        }
+        overlayView.showIndicator()
         NSApp.activate(ignoringOtherApps: true)
         Task { @MainActor in
             self.capturedBackground = try? await ScreenCapture.captureMainDisplay()
             self.overlayView.needsDisplay = true
         }
     }
-
-    /// Reference to the control panel, set by AppDelegate when creating the overlay.
-    weak var panelController: ControlPanelWindowController?
 
     override func close() {
         super.close()
@@ -67,6 +60,7 @@ final class OverlayWindowController: NSWindowController {
     }
 
     private func closeOverlay() {
+        overlayView.hideIndicator()
         close()
     }
 }
