@@ -131,11 +131,18 @@ final class ExitPanelView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = NSColor(calibratedWhite: 0.12, alpha: 0.94).cgColor
+        // Light background for maximum contrast in all modes (whiteboard, blackboard, normal)
+        layer?.backgroundColor = NSColor(calibratedWhite: 0.96, alpha: 0.95).cgColor
         layer?.cornerRadius = 12
+        layer?.borderWidth = 1.5
+        layer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 0.4).cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowRadius = 8
+        layer?.shadowOpacity = 0.3
+        layer?.shadowOffset = CGSize(width: 0, height: -2)
 
         let label = NSTextField(labelWithString: "Exit annotate mode?")
-        label.textColor = .white
+        label.textColor = NSColor(calibratedWhite: 0.1, alpha: 1.0)
         label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.frame = NSRect(x: 14, y: 58, width: 150, height: 18)
         addSubview(label)

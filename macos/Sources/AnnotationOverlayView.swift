@@ -345,9 +345,20 @@ final class AnnotationOverlayView: NSView {
     // MARK: - Keyboard events
 
     override func keyDown(with event: NSEvent) {
-        if let field = activeTextField, window?.firstResponder === field.currentEditor() {
-            super.keyDown(with: event)
-            return
+        // If a text field is active and either it or its editor is the first responder,
+        // or if we simply have an active text field, delegate to it.
+        if let field = activeTextField {
+            let editor = field.currentEditor()
+            if window?.firstResponder === editor || window?.firstResponder === field {
+                super.keyDown(with: event)
+                return
+            }
+            // Even if responder chain is stale (the known macOS overlay issue),
+            // redirect character input directly into the text field's editor.
+            if let chars = event.characters, !chars.isEmpty {
+                editor?.insertText(chars, replacementRange: editor.selectedRange())
+                return
+            }
         }
 
         let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
@@ -367,14 +378,27 @@ final class AnnotationOverlayView: NSView {
             return
         }
 
-        // Delete / Backspace in select-all mode
-        if allSelected && (event.keyCode == 51 || event.keyCode == 117) {
-            state.clear(); exitSelectAll(); return
+        // Delete / Backspace: clear all in select-all mode, otherwise let text field handle it
+        if (event.keyCode == 51 || event.keyCode == 117) {
+            if allSelected {
+                state.clear(); exitSelectAll()
+            }
+            // If activeTextField is non-nil, let the text field handle backspace naturally
+            // (it bubbles up through the responder chain to the field's editor)
+            return
         }
 
-        // Escape in select-all mode
-        if allSelected && event.keyCode == 53 {
-            exitSelectAll(); return
+        // Escape in text-input mode cancels text; in select-all mode exits selection
+        if event.keyCode == 53 {
+            if activeTextField != nil {
+                activeTextField?.removeFromSuperview()
+                activeTextField = nil
+            } else if allSelected {
+                exitSelectAll()
+            } else {
+                showExitPanel()
+            }
+            return
         }
 
         // ⌘Z — undo
@@ -408,7 +432,6 @@ final class AnnotationOverlayView: NSView {
             case "r": state.increaseSize()
             case "e": state.decreaseSize()
             default:
-                if event.keyCode == 53 { showExitPanel() }
                 updateIndicator(); return
             }
             updateIndicator()
@@ -429,24 +452,39 @@ final class AnnotationOverlayView: NSView {
 
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
-        let textH = max(24, state.fontSize * 1.5)
+        let textH = max(28, state.fontSize * 1.6)
+        let textW: CGFloat = 300
+        let fieldX = point.x - 4
+        let fieldY = point.y - textH / 2
         let field = NSTextField(frame: NSRect(
-            x: point.x - 4,
-            y: point.y - textH / 2,
-            width: 240,
+            x: fieldX,
+            y: fieldY,
+            width: textW,
             height: textH
         ))
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = .systemFont(ofSize: state.fontSize)
+        // Make the text box clearly visible with a semi-opaque background and border
+        field.isBordered = true
+        field.drawsBackground = true
+        field.backgroundColor = NSColor(calibratedWhite: 0.95, alpha: 0.85)
         field.textColor = state.color
-        field.backgroundColor = .clear
-        field.isBezeled = false
+        field.font = .systemFont(ofSize: state.fontSize)
+        field.focusRingType = .none
+        field.isBezeled = true
+        field.bezelStyle = .roundedBezel
+        field.bezelColor = state.color.withAlphaComponent(0.6)
         field.stringValue = ""
+        field.placeholderString = "Type here…"
         field.delegate = self
         field.maximumNumberOfLines = 0
+        field.wantsLayer = true
+        field.layer?.cornerRadius = 4
+        field.layer?.borderWidth = 1.5
+        field.layer?.borderColor = state.color.withAlphaComponent(0.7).cgColor
         addSubview(field)
+        // CRITICAL: make window key BEFORE setting first responder.
+        // Without this, the overlay window's responder chain may not update correctly
+        // for borderless windows at .screenSaver level.
+        window?.makeKey()
         window?.makeFirstResponder(field)
         activeTextField = field
     }
