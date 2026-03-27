@@ -36,14 +36,24 @@ final class AnnotationState {
         case callout(x: CGFloat, y: CGFloat, n: Int, color: NSColor, radius: CGFloat)
     }
 
-    var tool: Tool = .draw { didSet { notifyChange() } }
-    var color: NSColor = .systemRed { didSet { persist(); notifyChange() } }
-    var lineWidth: CGFloat = 3 { didSet { persist(); notifyChange() } }
-    var fontSize: CGFloat = 18 { didSet { notifyChange() } }
+    var tool: Tool = .draw { didSet { notifyPreviewChange() } }
+    var color: NSColor = .systemRed { didSet { persist(); notifyPreviewChange() } }
+    var lineWidth: CGFloat = 3 { didSet { persist(); notifyPreviewChange() } }
+    var fontSize: CGFloat = 18 { didSet { notifyPreviewChange() } }
 
     private(set) var actions: [Action] = []
     private var redoStack: [Action] = []
+
+    /// Incremented whenever committed actions change (add/undo/redo/clear).
+    /// The overlay uses this to decide whether to rebuild its cached render.
+    private(set) var committedVersion: Int = 0
+
+    /// Called for any state change — used by the control panel to sync UI.
     var onChange: (() -> Void)?
+
+    /// Called only when the committed action list changes.
+    /// Used by the overlay to invalidate its cached render.
+    var onActionListChange: (() -> Void)?
 
     init() {
         restore()
@@ -52,25 +62,33 @@ final class AnnotationState {
     func add(_ action: Action) {
         actions.append(action)
         redoStack.removeAll()
-        notifyChange()
+        committedVersion += 1
+        onActionListChange?()
+        onChange?()
     }
 
     func undo() {
         guard let last = actions.popLast() else { return }
         redoStack.append(last)
-        notifyChange()
+        committedVersion += 1
+        onActionListChange?()
+        onChange?()
     }
 
     func redo() {
         guard let last = redoStack.popLast() else { return }
         actions.append(last)
-        notifyChange()
+        committedVersion += 1
+        onActionListChange?()
+        onChange?()
     }
 
     func clear() {
         actions.removeAll()
         redoStack.removeAll()
-        notifyChange()
+        committedVersion += 1
+        onActionListChange?()
+        onChange?()
     }
 
     func hasActions() -> Bool { !actions.isEmpty }
@@ -92,7 +110,11 @@ final class AnnotationState {
         else { lineWidth = max(lineWidth - 1, 1) }
     }
 
-    private func notifyChange() { onChange?() }
+    /// Called for preview-only changes (tool, color, width, fontSize).
+    /// Does NOT increment committedVersion — no cache rebuild needed.
+    private func notifyPreviewChange() {
+        onChange?()
+    }
 
     private func persist() {
         if let rgb = color.usingColorSpace(.deviceRGB) {

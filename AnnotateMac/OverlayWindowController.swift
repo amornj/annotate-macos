@@ -21,6 +21,7 @@ final class OverlayWindowController: NSWindowController {
         overlayView.autoresizingMask = [.width, .height]
         overlayView.onExitRequested = { [weak self] in self?.closeOverlay() }
         overlayView.onSaveRequested = { [weak self] in self?.saveComposite() }
+        overlayView.onToggleRequested = { [weak self] in self?.closeOverlay() }
     }
 
     required init?(coder: NSCoder) {

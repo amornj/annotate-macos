@@ -3,6 +3,7 @@ import AppKit
 final class AnnotationOverlayView: NSView {
     var onExitRequested: (() -> Void)?
     var onSaveRequested: (() -> Void)?
+    var onToggleRequested: (() -> Void)?
 
     private let state: AnnotationState
     private var currentPath: [AnnotationState.StrokePoint] = []
@@ -18,6 +19,10 @@ final class AnnotationOverlayView: NSView {
     private var indicatorMoved = false
     private var exitPanel: ExitPanelView?
     private var selectHint: NSTextField?
+
+    // --- Cached rendering: separates committed actions from live preview ---
+    private var committedCache: NSImage?
+    private var lastCommittedVersion: Int = 0
 
     /// Shared color palette — must match ControlPanelWindowController exactly
     private static let sharedColors: [NSColor] = [
@@ -36,8 +41,9 @@ final class AnnotationOverlayView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         postsFrameChangedNotifications = true
         setupIndicator()
-        state.onChange = { [weak self] in
-            self?.updateIndicator()
+        // Track committed action changes separately from preview-only changes
+        state.onActionListChange = { [weak self] in
+            self?.invalidateCache()
             self?.needsDisplay = true
         }
         updateIndicator()
@@ -75,7 +81,19 @@ final class AnnotationOverlayView: NSView {
         let image = NSImage(size: bounds.size)
         image.lockFocus()
         background?.draw(in: bounds)
-        drawActions(in: NSGraphicsContext.current!.cgContext)
+        if let ctx = NSGraphicsContext.current?.cgContext {
+            // Render committed actions
+            for action in state.actions {
+                renderAction(action, in: ctx)
+            }
+            // Also include any in-progress stroke (live preview) so saves capture what you see
+            if isDrawing, state.tool == .draw, currentPath.count >= 1 {
+                renderDrawStroke(currentPath, color: state.color, lineWidth: state.lineWidth, in: ctx)
+            }
+            if isDrawing, let start = dragStart, let current = dragCurrent {
+                renderShapePreview(from: start, to: current, in: ctx)
+            }
+        }
         image.unlockFocus()
         return image
     }
@@ -83,45 +101,61 @@ final class AnnotationOverlayView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        drawActions(in: ctx)
+
+        // Step 1: rebuild committed cache if stale (only committed actions, not live preview)
+        if state.committedVersion != lastCommittedVersion {
+            committedCache = nil
+            committedCache = renderCommittedActions()
+            lastCommittedVersion = state.committedVersion
+        }
+
+        // Step 2: draw cached committed actions (cheap — single blit)
+        if let cache = committedCache {
+            cache.draw(in: bounds)
+        }
+
+        // Step 3: draw live preview on top (current stroke + select overlay)
+        drawPreview(in: ctx)
+
         if allSelected && state.hasActions() {
             ctx.setFillColor(NSColor.systemBlue.withAlphaComponent(0.12).cgColor)
             ctx.fill(bounds)
         }
     }
 
-    private func drawActions(in ctx: CGContext) {
-        for action in state.actions {
-            render(action, in: ctx)
+    /// Renders all committed actions to a cached image.
+    private func renderCommittedActions() -> NSImage {
+        let img = NSImage(size: bounds.size)
+        img.lockFocus()
+        if let ctx = NSGraphicsContext.current?.cgContext {
+            for action in state.actions {
+                renderAction(action, in: ctx)
+            }
         }
+        img.unlockFocus()
+        return img
+    }
+
+    /// Draws only the in-progress preview (current drag stroke) on top of the cache.
+    private func drawPreview(in ctx: CGContext) {
+        // Freehand drawing: render accumulated points as a live stroke
+        if isDrawing, state.tool == .draw, currentPath.count >= 1 {
+            renderDrawStroke(currentPath, color: state.color, lineWidth: state.lineWidth, in: ctx)
+        }
+        // Other tools: render preview shape from drag start to current position
         if isDrawing, let start = dragStart, let current = dragCurrent {
-            renderPreview(from: start, to: current, in: ctx)
+            renderShapePreview(from: start, to: current, in: ctx)
         }
     }
 
-    private func render(_ action: AnnotationState.Action, in ctx: CGContext) {
+    private func renderAction(_ action: AnnotationState.Action, in ctx: CGContext) {
         ctx.saveGState()
         switch action {
         case let .draw(points, color, lineWidth):
-            color.setStroke()
-            color.setFill()
-            ctx.setLineWidth(lineWidth)
-            ctx.setLineCap(.round)
-            ctx.setLineJoin(.round)
-            if points.count < 2, let p = points.first {
-                let rect = CGRect(x: p.x - lineWidth / 2, y: p.y - lineWidth / 2, width: lineWidth, height: lineWidth)
-                ctx.fillEllipse(in: rect)
-            } else if let first = points.first {
-                ctx.beginPath()
-                ctx.move(to: CGPoint(x: first.x, y: first.y))
-                for p in points.dropFirst() {
-                    ctx.addLine(to: CGPoint(x: p.x, y: p.y))
-                }
-                ctx.strokePath()
-            }
+            renderDrawStroke(points, color: color, lineWidth: lineWidth, in: ctx)
         case let .arrow(x1, y1, x2, y2, color, lineWidth):
             color.setStroke(); color.setFill(); ctx.setLineWidth(lineWidth); ctx.setLineCap(.round); ctx.setLineJoin(.round)
-            drawArrow(in: ctx, from: CGPoint(x: x1, y: y1), to: CGPoint(x: x2, y: y2), lineWidth: lineWidth)
+            drawArrowShape(in: ctx, from: CGPoint(x: x1, y: y1), to: CGPoint(x: x2, y: y2), lineWidth: lineWidth)
         case let .line(x1, y1, x2, y2, color, lineWidth):
             color.setStroke(); ctx.setLineWidth(lineWidth); ctx.setLineCap(.round)
             ctx.beginPath(); ctx.move(to: CGPoint(x: x1, y: y1)); ctx.addLine(to: CGPoint(x: x2, y: y2)); ctx.strokePath()
@@ -155,20 +189,40 @@ final class AnnotationOverlayView: NSView {
         ctx.restoreGState()
     }
 
-    private func renderPreview(from start: CGPoint, to end: CGPoint, in ctx: CGContext) {
+    private func renderDrawStroke(_ points: [AnnotationState.StrokePoint], color: NSColor, lineWidth: CGFloat, in ctx: CGContext) {
+        color.setStroke()
+        ctx.setLineWidth(lineWidth)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        if points.count < 2 {
+            if let p = points.first {
+                let rect = CGRect(x: p.x - lineWidth / 2, y: p.y - lineWidth / 2, width: lineWidth, height: lineWidth)
+                ctx.fillEllipse(in: rect)
+            }
+        } else if let first = points.first {
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: first.x, y: first.y))
+            for p in points.dropFirst() {
+                ctx.addLine(to: CGPoint(x: p.x, y: p.y))
+            }
+            ctx.strokePath()
+        }
+    }
+
+    private func renderShapePreview(from start: CGPoint, to end: CGPoint, in ctx: CGContext) {
         switch state.tool {
         case .draw: break
-        case .arrow: render(.arrow(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .line: render(.line(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .square: render(.square(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .circle: render(.circle(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .highlight: render(.highlight(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color), in: ctx)
-        case .blackboard: render(.blackboard(x1: start.x, y1: start.y, x2: end.x, y2: end.y), in: ctx)
+        case .arrow: renderAction(.arrow(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
+        case .line: renderAction(.line(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
+        case .square: renderAction(.square(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
+        case .circle: renderAction(.circle(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
+        case .highlight: renderAction(.highlight(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color), in: ctx)
+        case .blackboard: renderAction(.blackboard(x1: start.x, y1: start.y, x2: end.x, y2: end.y), in: ctx)
         case .text, .callout: break
         }
     }
 
-    private func drawArrow(in ctx: CGContext, from start: CGPoint, to end: CGPoint, lineWidth: CGFloat) {
+    private func drawArrowShape(in ctx: CGContext, from start: CGPoint, to end: CGPoint, lineWidth: CGFloat) {
         ctx.beginPath()
         ctx.move(to: start)
         ctx.addLine(to: end)
@@ -182,6 +236,15 @@ final class AnnotationOverlayView: NSView {
         ctx.closePath()
         ctx.fillPath()
     }
+
+    // MARK: - Cache invalidation
+
+    private func invalidateCache() {
+        committedCache = nil
+        lastCommittedVersion = state.committedVersion
+    }
+
+    // MARK: - Mouse events
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
@@ -225,35 +288,73 @@ final class AnnotationOverlayView: NSView {
         isDrawing = false
         let location = convert(event.locationInWindow, from: nil)
         guard let start = dragStart else { return }
-        defer { dragStart = nil; dragCurrent = nil; needsDisplay = true }
+        defer { dragStart = nil; dragCurrent = nil; currentPath = [] }
+
         switch state.tool {
         case .draw:
-            if currentPath.count == 1 { currentPath.append(currentPath[0]) }
-            state.add(.draw(points: currentPath, color: state.color, lineWidth: state.lineWidth))
-            currentPath = []
-        case .arrow: state.add(.arrow(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
-        case .line: state.add(.line(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
+            var points = currentPath
+            if points.count == 1 { points.append(points[0]) }
+            state.add(.draw(points: points, color: state.color, lineWidth: state.lineWidth))
+        case .arrow:  state.add(.arrow(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
+        case .line:    state.add(.line(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .square: state.add(.square(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .circle: state.add(.circle(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .highlight: state.add(.highlight(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color))
         case .blackboard: state.add(.blackboard(x1: start.x, y1: start.y, x2: location.x, y2: location.y))
         case .text, .callout: break
         }
+        // state.add() already called invalidateCache() via onActionListChange
+        needsDisplay = true
     }
 
+    // MARK: - Keyboard events
+
     override func keyDown(with event: NSEvent) {
+        // Route to active text field first
         if let field = activeTextField, window?.firstResponder === field.currentEditor() {
             super.keyDown(with: event)
             return
         }
+
         let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        let mod = event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control)
-        if mod && chars == "a" { if state.hasActions() { enterSelectAll() }; return }
-        if allSelected && (event.keyCode == 51 || event.keyCode == 117) { state.clear(); exitSelectAll(); return }
-        if allSelected && event.keyCode == 53 { exitSelectAll(); return }
-        if mod && chars == "z" && !event.modifierFlags.contains(.shift) { state.undo(); return }
-        if mod && (chars == "y" || (chars == "z" && event.modifierFlags.contains(.shift))) { state.redo(); return }
-        if !mod {
+        let hasCmd = event.modifierFlags.contains(.command)
+        let hasShift = event.modifierFlags.contains(.shift)
+        let hasOpt  = event.modifierFlags.contains(.option)
+
+        // Option+1: toggle overlay (fallback if global hotkey missed it)
+        if hasOpt && chars == "1" && !hasCmd {
+            onToggleRequested?()
+            return
+        }
+
+        // ⌘A — select all (only if there are actions)
+        if hasCmd && chars == "a" {
+            if state.hasActions() { enterSelectAll() }
+            return
+        }
+
+        // Delete / Backspace in select-all mode
+        if allSelected && (event.keyCode == 51 || event.keyCode == 117) {
+            state.clear(); exitSelectAll(); return
+        }
+
+        // Escape in select-all mode
+        if allSelected && event.keyCode == 53 {
+            exitSelectAll(); return
+        }
+
+        // ⌘Z — undo
+        if hasCmd && chars == "z" && !hasShift {
+            state.undo(); return
+        }
+
+        // ⌘⇧Z or ⌘Y — redo
+        if hasCmd && (chars == "y" || (chars == "z" && hasShift)) {
+            state.redo(); return
+        }
+
+        // Tool / color / size shortcuts (no modifiers)
+        if !hasCmd && !hasShift && !hasOpt {
             switch chars {
             case "d": state.tool = .draw
             case "a": state.tool = .arrow
@@ -280,7 +381,21 @@ final class AnnotationOverlayView: NSView {
             needsDisplay = true
             return
         }
+
         super.keyDown(with: event)
+    }
+
+    // Also handle Option+1 via flagsChanged as a belt-and-suspenders approach
+    override func flagsChanged(with event: NSEvent) {
+        // If Option key is held on its own (no cmd, no ctrl), treat as toggle shortcut
+        let hasOpt  = event.modifierFlags.contains(.option)
+        let hasCmd  = event.modifierFlags.contains(.command)
+        let hasCtrl = event.modifierFlags.contains(.control)
+        if hasOpt && !hasCmd && !hasCtrl {
+            // Check if the 1 key was just pressed alongside Option
+            // flagsChanged doesn't give us the key char, so we rely on keyDown for the actual toggle
+        }
+        super.flagsChanged(with: event)
     }
 
     private func updateIndicator() {
@@ -288,6 +403,8 @@ final class AnnotationOverlayView: NSView {
         indicatorView.color = state.color
         indicatorView.weight = state.tool == .text ? max(1, (state.fontSize - 8) / 3.5) : state.lineWidth
     }
+
+    // MARK: - Text input
 
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
@@ -323,6 +440,8 @@ final class AnnotationOverlayView: NSView {
         needsDisplay = true
     }
 
+    // MARK: - Select all
+
     private func enterSelectAll() {
         allSelected = true
         if selectHint == nil {
@@ -333,7 +452,7 @@ final class AnnotationOverlayView: NSView {
             label.alignment = .center
             label.font = .systemFont(ofSize: 13)
             label.isBezeled = false
-            label.frame = NSRect(x: bounds.midX - 180, y: bounds.height - 40, width: 360, height: 24)
+            label.frame = NSRect(x: bounds.midX - 200, y: bounds.height - 40, width: 400, height: 24)
             label.wantsLayer = true
             label.layer?.cornerRadius = 8
             addSubview(label)
@@ -348,6 +467,8 @@ final class AnnotationOverlayView: NSView {
         selectHint = nil
         needsDisplay = true
     }
+
+    // MARK: - Panels
 
     private func showHelpPanel() {
         let alert = NSAlert()

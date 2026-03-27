@@ -32,16 +32,17 @@ final class ControlPanelWindowController: NSWindowController {
     init(state: AnnotationState) {
         self.state = state
         let window = NSPanel(
-            contentRect: NSRect(x: 120, y: 120, width: 260, height: 170),
+            contentRect: NSRect(x: 120, y: 120, width: 310, height: 210),
             styleMask: [.titled, .utilityWindow, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "Annotate Controls"
-        window.level = .floating
+        // Keep the panel above the overlay (which uses .screenSaver level).
+        // .popUpMenu is the highest normal level, ensuring the dashboard stays on top.
+        window.level = .popUpMenu
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        // Non-activating: keeps first responder on the overlay window
         window.styleMask.insert(.nonactivatingPanel)
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
@@ -116,10 +117,14 @@ final class ControlPanelWindowController: NSWindowController {
         widthRow.addArrangedSubview(widthLabel)
         stack.addArrangedSubview(widthRow)
 
-        // --- Hint ---
+        // --- Hint (two lines, use preferredMaxLayoutWidth for proper wrapping) ---
         let hint = NSTextField(wrappingLabelWithString: "Shortcuts: Option+1 toggle · D/A/L/S/C/F/H/B/N tools · 1-6 colors · R/E size · ⌘Z/⌘Y undo/redo · Esc exit")
         hint.textColor = .secondaryLabelColor
         hint.font = .systemFont(ofSize: 11)
+        // Allow the label to expand vertically with proper wrapping
+        hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        hint.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        hint.preferredMaxLayoutWidth = 286  // window width minus insets (12 + 12 + 2 for safety)
         stack.addArrangedSubview(hint)
     }
 
@@ -129,7 +134,6 @@ final class ControlPanelWindowController: NSWindowController {
         widthLabel.stringValue = String(Int(state.lineWidth))
         highlightSelectedColor()
 
-        // Use weak self to avoid retain cycle
         state.onChange = { [weak self] in
             DispatchQueue.main.async {
                 self?.syncFromState()
