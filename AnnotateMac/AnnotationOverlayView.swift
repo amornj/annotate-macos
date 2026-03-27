@@ -103,7 +103,8 @@ final class AnnotationOverlayView: NSView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
         // Step 1: rebuild committed cache if stale (only committed actions, not live preview)
-        if state.committedVersion != lastCommittedVersion {
+        // Also rebuild whenever the cache is nil as a safety net.
+        if state.committedVersion != lastCommittedVersion || committedCache == nil {
             committedCache = nil
             committedCache = renderCommittedActions()
             lastCommittedVersion = state.committedVersion
@@ -241,7 +242,8 @@ final class AnnotationOverlayView: NSView {
 
     private func invalidateCache() {
         committedCache = nil
-        lastCommittedVersion = state.committedVersion
+        // Do NOT update lastCommittedVersion here — leave it stale so the
+        // version check in draw() triggers a cache rebuild on the next call.
     }
 
     // MARK: - Mouse events

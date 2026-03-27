@@ -15,6 +15,8 @@ func colorsMatch(_ a: NSColor, _ b: NSColor, tolerance: CGFloat = 0.01) -> Bool 
 
 final class ControlPanelWindowController: NSWindowController {
     private let state: AnnotationState
+    /// Reference to the overlay window controller so keyboard events can be forwarded.
+    weak var overlayWindowController: OverlayWindowController?
     private let stack = NSStackView()
     private let toolPopup = NSPopUpButton()
     private let widthSlider = NSSlider(value: 3, minValue: 1, maxValue: 20, target: nil, action: nil)
@@ -39,11 +41,13 @@ final class ControlPanelWindowController: NSWindowController {
         )
         window.title = "Annotate Controls"
         // Keep the panel above the overlay (which uses .screenSaver level).
-        // .popUpMenu is the highest normal level, ensuring the dashboard stays on top.
-        window.level = .popUpMenu
+        // .floating is below .popUpMenu but still above normal windows,
+        // and it allows the panel to become key when activated.
+        window.level = .floating
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.styleMask.insert(.nonactivatingPanel)
+        // Remove .nonactivatingPanel so the panel can properly become key
+        // and receive keyboard events when the app is active.
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
         super.init(window: window)
@@ -54,6 +58,8 @@ final class ControlPanelWindowController: NSWindowController {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    override var acceptsFirstResponder: Bool { true }
 
     private func setupUI() {
         guard let content = window?.contentView else { return }
@@ -183,5 +189,28 @@ final class ControlPanelWindowController: NSWindowController {
 
     @objc private func widthChanged() {
         state.lineWidth = CGFloat(widthSlider.doubleValue.rounded())
+    }
+
+    // MARK: - Keyboard forwarding
+
+    /// Forward keyboard events to the overlay so shortcuts work even when the panel is key.
+    override func keyDown(with event: NSEvent) {
+        if let overlayVC = overlayWindowController,
+           let overlayWindow = overlayVC.window,
+           let overlayView = overlayWindow.contentView {
+            overlayView.keyDown(with: event)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        if let overlayVC = overlayWindowController,
+           let overlayWindow = overlayVC.window,
+           let overlayView = overlayWindow.contentView {
+            overlayView.flagsChanged(with: event)
+        } else {
+            super.flagsChanged(with: event)
+        }
     }
 }

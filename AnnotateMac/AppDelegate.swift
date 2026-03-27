@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayController = nil
         } else if overlayController == nil {
             let controller = OverlayWindowController(state: state)
+            controller.panelController = panelController  // wire up for panel ordering
+            panelController?.overlayWindowController = controller  // forward keyboard events to overlay
             controller.onClosed = { [weak self] in
                 self?.overlayController = nil
             }
