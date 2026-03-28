@@ -10,4 +10,7 @@ if [[ -z "${APP_PATH:-}" ]]; then
 fi
 rm -rf dist/AnnotateMac.app
 cp -R "$APP_PATH" dist/AnnotateMac.app
-echo "Built app copied to: dist/AnnotateMac.app"
+
+# Re-sign with Apple Development certificate so macOS remembers screen recording permission across rebuilds
+codesign --force --deep --sign "9426B1D882541FEE12EEDCC7E4E4FB7753E7C3C8" dist/AnnotateMac.app
+echo "Built and signed: dist/AnnotateMac.app"

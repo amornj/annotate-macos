@@ -10,16 +10,16 @@ final class AnnotationOverlayView: NSView {
     private var isDrawing = false
     private var dragStart: CGPoint?
     private var dragCurrent: CGPoint?
-    private var activeTextField: NSTextField?
+    private var activeTextView: NSTextView?
     private var allSelected = false
     private var indicatorView = ToolIndicatorView(frame: NSRect(x: 24, y: 24, width: 44, height: 44))
     private var indicatorPanOffset: CGPoint = .zero
     private var isDraggingIndicator = false
     private var wasDrawingBeforeIndicatorDrag = false
     private var indicatorMoved = false
-    private var exitPanel: ExitPanelView?
     private var selectHint: NSTextField?
     private var localMonitor: Any?
+    private var lastEscTime: Date?
 
     // --- Cached rendering: separates committed actions from live preview ---
     private var committedCache: NSImage?
@@ -129,7 +129,7 @@ final class AnnotationOverlayView: NSView {
     }
 
     func hideIndicator() {
-        commitTextIfNeeded()
+        cancelTextInput()
         indicatorView.isHidden = true
     }
 
@@ -246,8 +246,14 @@ final class AnnotationOverlayView: NSView {
             let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
             ctx.strokeEllipse(in: rect)
         case let .text(text, x, y, fontSize, color):
-            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: fontSize), .foregroundColor: color]
-            NSString(string: text).draw(at: CGPoint(x: x, y: y), withAttributes: attrs)
+            let font = NSFont.systemFont(ofSize: fontSize)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+            let attrStr = NSAttributedString(string: text, attributes: attrs)
+            let br = attrStr.boundingRect(
+                with: CGSize(width: 300, height: 2000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading]
+            )
+            attrStr.draw(in: NSRect(x: x, y: y, width: ceil(br.width) + 4, height: ceil(br.height) + 8))
         case let .callout(x, y, n, color, radius):
             ctx.setFillColor(color.cgColor)
             ctx.fillEllipse(in: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2))
@@ -378,11 +384,9 @@ final class AnnotationOverlayView: NSView {
     // MARK: - Keyboard events
 
     override func keyDown(with event: NSEvent) {
-        // If a text field is active, let it (or its editor) handle all input.
-        // We check field.acceptsFirstResponder because the field's editor is lazily
-        // created — during the transition the firstResponder IS the field itself.
-        if let field = activeTextField, field.acceptsFirstResponder {
-            super.keyDown(with: event)
+        // If a text view is active, forward all input directly to it.
+        if let tv = activeTextView {
+            tv.keyDown(with: event)
             return
         }
 
@@ -408,9 +412,23 @@ final class AnnotationOverlayView: NSView {
             state.clear(); exitSelectAll(); return
         }
 
-        // Escape in select-all mode
-        if allSelected && event.keyCode == 53 {
-            exitSelectAll(); return
+        // Esc: single = clear all annotations, double = exit app
+        if event.keyCode == 53 {
+            if allSelected { exitSelectAll() }
+            let now = Date()
+            if let last = lastEscTime, now.timeIntervalSince(last) < 0.5 {
+                lastEscTime = nil
+                state.clear()
+                indicatorView.isHidden = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    NSApp.terminate(nil)
+                }
+            } else {
+                lastEscTime = now
+                state.clear()
+                needsDisplay = true
+            }
+            return
         }
 
         // ⌘Z — undo
@@ -425,16 +443,18 @@ final class AnnotationOverlayView: NSView {
 
         // Tool / color / size shortcuts (no modifiers)
         if !hasCmd && !hasShift && !hasOpt {
+            let inTextMode = state.tool == .text
             switch chars {
-            case "d": state.tool = .draw
-            case "a": state.tool = .arrow
-            case "l": state.tool = .line
-            case "s": state.tool = .square
-            case "c": state.tool = .circle
+            // Tool changes are blocked while in F/text mode
+            case "d": if !inTextMode { state.tool = .draw }
+            case "a": if !inTextMode { state.tool = .arrow }
+            case "l": if !inTextMode { state.tool = .line }
+            case "s": if !inTextMode { state.tool = .square }
+            case "c": if !inTextMode { state.tool = .circle }
             case "f": state.tool = .text
-            case "n": state.tool = .callout
-            case "w": state.backgroundMode = .whiteboard; state.tool = .draw
-            case "b": state.backgroundMode = .blackboard; state.tool = .draw
+            case "n": if !inTextMode { state.tool = .callout }
+            case "w": if !inTextMode { state.backgroundMode = .whiteboard; state.tool = .draw }
+            case "b": if !inTextMode { state.backgroundMode = .blackboard; state.tool = .draw }
             case "1": state.color = Self.sharedColors[0]
             case "2": state.color = Self.sharedColors[1]
             case "3": state.color = Self.sharedColors[2]
@@ -444,7 +464,6 @@ final class AnnotationOverlayView: NSView {
             case "r": state.increaseSize()
             case "e": state.decreaseSize()
             default:
-                if event.keyCode == 53 { showExitPanel() }
                 updateIndicator(); return
             }
             updateIndicator()
@@ -466,44 +485,65 @@ final class AnnotationOverlayView: NSView {
     private func startTextInput(at point: CGPoint) {
         commitTextIfNeeded()
 
-        // Ensure the overlay window is key so keyboard input goes to the text field.
         window?.makeKey()
-        window?.makeFirstResponder(self)
 
-        let textH = max(24, state.fontSize * 1.5)
-        let field = NSTextField(frame: NSRect(
-            x: point.x - 4,
-            y: point.y - textH / 2,
-            width: 240,
-            height: textH
+        let fontSize = state.fontSize
+        let initialHeight = max(30, fontSize * 1.8)
+        // Anchor the top of the text view at the click point; new lines grow downward.
+        let tv = NSTextView(frame: NSRect(
+            x: point.x,
+            y: point.y - initialHeight,
+            width: 300,
+            height: initialHeight
         ))
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = .systemFont(ofSize: state.fontSize)
-        field.textColor = state.color
-        field.backgroundColor = .clear
-        field.isBezeled = false
-        field.stringValue = ""
-        field.delegate = self
-        field.maximumNumberOfLines = 0
-        addSubview(field)
-        window?.makeFirstResponder(field)
-        activeTextField = field
+        tv.isEditable = true
+        tv.isSelectable = true
+        tv.font = .systemFont(ofSize: fontSize)
+        tv.textColor = state.color
+        tv.backgroundColor = .clear
+        tv.drawsBackground = false
+        tv.isRichText = false
+        tv.usesRuler = false
+        tv.usesFontPanel = false
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.maxSize = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.widthTracksTextView = true
+        tv.textContainer?.containerSize = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        tv.insertionPointColor = state.color
+        tv.delegate = self
+        // Subtle dashed border so user can see the active text area
+        tv.wantsLayer = true
+        tv.layer?.borderColor = state.color.withAlphaComponent(0.5).cgColor
+        tv.layer?.borderWidth = 1
+        tv.layer?.cornerRadius = 2
+
+        addSubview(tv)
+        window?.makeFirstResponder(tv)
+        activeTextView = tv
     }
 
     private func commitTextIfNeeded() {
-        guard let field = activeTextField else { return }
-        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let tv = activeTextView else { return }
+        let text = tv.string.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty {
-            state.add(.text(text: text, x: field.frame.minX, y: field.frame.minY, fontSize: state.fontSize, color: state.color))
+            state.add(.text(text: text, x: tv.frame.minX, y: tv.frame.minY, fontSize: state.fontSize, color: state.color))
         }
-        // Properly resign first responder so the overlay regains it.
-        if field.window?.firstResponder === field || field.window?.firstResponder === field.currentEditor() {
-            field.window?.makeFirstResponder(self)
+        if tv.window?.firstResponder === tv {
+            tv.window?.makeFirstResponder(self)
         }
-        field.removeFromSuperview()
-        activeTextField = nil
+        tv.removeFromSuperview()
+        activeTextView = nil
+        needsDisplay = true
+    }
+
+    private func cancelTextInput() {
+        guard let tv = activeTextView else { return }
+        if tv.window?.firstResponder === tv {
+            tv.window?.makeFirstResponder(self)
+        }
+        tv.removeFromSuperview()
+        activeTextView = nil
         needsDisplay = true
     }
 
@@ -559,48 +599,47 @@ final class AnnotationOverlayView: NSView {
         alert.beginSheetModal(for: window!)
     }
 
-    private func showExitPanel() {
-        exitPanel?.removeFromSuperview()
-        exitPanel = nil
 
-        let panel = ExitPanelView(frame: NSRect(
-            x: bounds.width - 200 - 24,
-            y: 24,
-            width: 180,
-            height: 92
-        ))
-        panel.onExit = { [weak self] in
-            self?.exitPanel?.removeFromSuperview()
-            self?.exitPanel = nil
-            // Erase all annotations and exit the app entirely
-            self?.state.clear()
-            self?.indicatorView.isHidden = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                NSApp.terminate(nil)
-            }
-        }
-        addSubview(panel)
-        exitPanel = panel
-    }
 }
 
-extension AnnotationOverlayView: NSTextFieldDelegate {
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+extension AnnotationOverlayView: NSTextViewDelegate {
+    func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
             if NSEvent.modifierFlags.contains(.shift) {
-                return false
+                // Shift+Enter: insert a real newline and resize
+                textView.insertNewlineIgnoringFieldEditor(nil)
+                resizeActiveTextView()
+                return true
             }
+            // Enter: commit text and stay in F mode for next click
             commitTextIfNeeded()
-            state.tool = .draw
             updateIndicator()
             needsDisplay = true
             return true
         }
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-            activeTextField?.removeFromSuperview()
-            activeTextField = nil
+            cancelTextInput()
             return true
         }
         return false
+    }
+
+    func textDidChange(_ notification: Notification) {
+        resizeActiveTextView()
+    }
+
+    private func resizeActiveTextView() {
+        guard let tv = activeTextView,
+              let lm = tv.layoutManager,
+              let tc = tv.textContainer else { return }
+        lm.ensureLayout(for: tc)
+        let used = lm.usedRect(for: tc)
+        let newHeight = max(state.fontSize * 1.8, used.height + 8)
+        if abs(tv.frame.height - newHeight) > 1 {
+            // Keep the top (maxY) fixed; grow the bottom downward.
+            let top = tv.frame.maxY
+            tv.frame.size.height = newHeight
+            tv.frame.origin.y = top - newHeight
+        }
     }
 }
