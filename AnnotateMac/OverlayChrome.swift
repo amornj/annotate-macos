@@ -3,49 +3,101 @@ import AppKit
 // MARK: - Tool Indicator View (floating tile)
 
 final class ToolIndicatorView: NSView {
-    var tool: AnnotationState.Tool = .draw { didSet { needsDisplay = true; updateGlow() } }
-    var color: NSColor = .systemRed { didSet { needsDisplay = true; updateGlow() } }
-    var weight: CGFloat = 3 { didSet { needsDisplay = true; updateGlow() } }
+    var tool: AnnotationState.Tool = .draw { didSet { needsDisplay = true; updateBorderLayers() } }
+    var color: NSColor = .systemRed { didSet { needsDisplay = true; updateBorderLayers() } }
+    var weight: CGFloat = 3 { didSet { needsDisplay = true; updateBorderLayers() } }
     var onMouseDown: ((CGPoint) -> Void)?
     var onMouseUp: (() -> Void)?
 
-    private var glowLayer: CALayer!
+    private let darkLayer = CAShapeLayer()
+    private let lightLayer = CAShapeLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        setupGlow()
+        for sl in [lightLayer, darkLayer] {
+            sl.fillColor = nil
+            sl.lineWidth = 2.5
+            sl.lineCap = .round
+            layer?.addSublayer(sl)
+        }
+        updateBorderLayers()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private func setupGlow() {
-        glowLayer = CALayer()
-        glowLayer.zPosition = -1
-        layer?.addSublayer(glowLayer)
-        updateGlow()
-    }
+    private func updateBorderLayers() {
+        guard let myLayer = layer else { return }
 
-    private func updateGlow() {
-        guard let layer = self.layer else { return }
-        let inset: CGFloat = -3 - weight * 0.3
-        let cornerRadius: CGFloat = 12 + weight * 0.15
-        let glowRect = bounds.insetBy(dx: inset, dy: inset)
-        glowLayer.frame = NSRectToCGRect(glowRect)
-        glowLayer.cornerRadius = cornerRadius
-        glowLayer.borderWidth = max(1.5, 1.5 + weight * 0.15)
-        glowLayer.borderColor = color.cgColor
-        layer.shadowColor = color.cgColor
-        layer.shadowRadius = max(2, weight * 0.8)
-        layer.shadowOffset = .zero
-        layer.shadowOpacity = 0.6
+        // Map weight (1–20) to clock level 1–12
+        let level = max(1, min(12, Int(weight.rounded())))
+        let path = Self.clockPath(in: bounds.insetBy(dx: 4, dy: 4), radius: 9)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        for sl in [lightLayer, darkLayer] {
+            sl.frame = myLayer.bounds
+            sl.path = path
+        }
+        // Dark segment: clock positions 1 → level (first fraction of path)
+        darkLayer.strokeColor = color.cgColor
+        darkLayer.strokeStart = 0
+        darkLayer.strokeEnd = CGFloat(level) / 12.0
+
+        // Light segment: clock positions (level+1) → 12 (remaining fraction)
+        lightLayer.strokeColor = color.withAlphaComponent(0.22).cgColor
+        lightLayer.strokeStart = CGFloat(level) / 12.0
+        lightLayer.strokeEnd = 1.0
+
+        CATransaction.commit()
+
+        myLayer.shadowColor = color.cgColor
+        myLayer.shadowRadius = 5
+        myLayer.shadowOffset = .zero
+        myLayer.shadowOpacity = 0.55
     }
 
     override func layout() {
         super.layout()
-        updateGlow()
+        updateBorderLayers()
+    }
+
+    /// Rounded-rect path starting at "1 o'clock" (right 1/3 of top straight edge),
+    /// going clockwise. strokeStart=0 → position 1, strokeEnd=N/12 → position N.
+    private static func clockPath(in rect: CGRect, radius: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let r = radius
+        let minX = rect.minX, maxX = rect.maxX
+        let minY = rect.minY, maxY = rect.maxY
+
+        // 1 o'clock: 2/3 along the top straight segment (right third)
+        let topStraight = (maxX - r) - (minX + r)
+        let startX = (minX + r) + topStraight * (2.0 / 3.0)
+
+        path.move(to: CGPoint(x: startX, y: minY))
+        // Remainder of top edge → top-right arc
+        path.addLine(to: CGPoint(x: maxX - r, y: minY))
+        path.addArc(center: CGPoint(x: maxX - r, y: minY + r),
+                    radius: r, startAngle: -.pi / 2, endAngle: 0, clockwise: false)
+        // Right edge → bottom-right arc
+        path.addLine(to: CGPoint(x: maxX, y: maxY - r))
+        path.addArc(center: CGPoint(x: maxX - r, y: maxY - r),
+                    radius: r, startAngle: 0, endAngle: .pi / 2, clockwise: false)
+        // Bottom edge (right→left) → bottom-left arc
+        path.addLine(to: CGPoint(x: minX + r, y: maxY))
+        path.addArc(center: CGPoint(x: minX + r, y: maxY - r),
+                    radius: r, startAngle: .pi / 2, endAngle: .pi, clockwise: false)
+        // Left edge (bottom→top) → top-left arc
+        path.addLine(to: CGPoint(x: minX, y: minY + r))
+        path.addArc(center: CGPoint(x: minX + r, y: minY + r),
+                    radius: r, startAngle: .pi, endAngle: 3 * .pi / 2, clockwise: false)
+        // Top edge back to "1 o'clock" start
+        path.addLine(to: CGPoint(x: startX, y: minY))
+
+        return path
     }
 
     override var isFlipped: Bool { true }
