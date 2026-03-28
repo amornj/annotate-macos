@@ -441,27 +441,8 @@ final class AnnotationOverlayView: NSView {
             state.redo(); return
         }
 
-        // No-modifier shortcuts
+        // No-modifier shortcuts — tool, color, size (always available when no text box is active)
         if !hasCmd && !hasShift && !hasOpt {
-            // F mode: tool is locked — only allow color and size changes
-            if state.tool == .text {
-                switch chars {
-                case "1": state.color = Self.sharedColors[0]
-                case "2": state.color = Self.sharedColors[1]
-                case "3": state.color = Self.sharedColors[2]
-                case "4": state.color = Self.sharedColors[3]
-                case "5": state.color = Self.sharedColors[4]
-                case "6": state.color = Self.sharedColors[5]
-                case "r": state.increaseSize()
-                case "e": state.decreaseSize()
-                default: break
-                }
-                updateIndicator()
-                needsDisplay = true
-                return
-            }
-
-            // Normal mode: full tool / color / size shortcuts
             switch chars {
             case "d": state.tool = .draw
             case "a": state.tool = .arrow
