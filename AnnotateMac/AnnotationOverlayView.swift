@@ -441,20 +441,37 @@ final class AnnotationOverlayView: NSView {
             state.redo(); return
         }
 
-        // Tool / color / size shortcuts (no modifiers)
+        // No-modifier shortcuts
         if !hasCmd && !hasShift && !hasOpt {
-            let inTextMode = state.tool == .text
+            // F mode: tool is locked — only allow color and size changes
+            if state.tool == .text {
+                switch chars {
+                case "1": state.color = Self.sharedColors[0]
+                case "2": state.color = Self.sharedColors[1]
+                case "3": state.color = Self.sharedColors[2]
+                case "4": state.color = Self.sharedColors[3]
+                case "5": state.color = Self.sharedColors[4]
+                case "6": state.color = Self.sharedColors[5]
+                case "r": state.increaseSize()
+                case "e": state.decreaseSize()
+                default: break
+                }
+                updateIndicator()
+                needsDisplay = true
+                return
+            }
+
+            // Normal mode: full tool / color / size shortcuts
             switch chars {
-            // Tool changes are blocked while in F/text mode
-            case "d": if !inTextMode { state.tool = .draw }
-            case "a": if !inTextMode { state.tool = .arrow }
-            case "l": if !inTextMode { state.tool = .line }
-            case "s": if !inTextMode { state.tool = .square }
-            case "c": if !inTextMode { state.tool = .circle }
+            case "d": state.tool = .draw
+            case "a": state.tool = .arrow
+            case "l": state.tool = .line
+            case "s": state.tool = .square
+            case "c": state.tool = .circle
             case "f": state.tool = .text
-            case "n": if !inTextMode { state.tool = .callout }
-            case "w": if !inTextMode { state.backgroundMode = .whiteboard; state.tool = .draw }
-            case "b": if !inTextMode { state.backgroundMode = .blackboard; state.tool = .draw }
+            case "n": state.tool = .callout
+            case "w": state.backgroundMode = .whiteboard; state.tool = .draw
+            case "b": state.backgroundMode = .blackboard; state.tool = .draw
             case "1": state.color = Self.sharedColors[0]
             case "2": state.color = Self.sharedColors[1]
             case "3": state.color = Self.sharedColors[2]
