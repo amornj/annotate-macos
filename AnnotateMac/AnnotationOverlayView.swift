@@ -508,6 +508,8 @@ final class AnnotationOverlayView: NSView {
         tv.maxSize = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
         tv.textContainer?.widthTracksTextView = true
         tv.textContainer?.containerSize = CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.lineFragmentPadding = 0   // no horizontal inset so preview matches commit
+        tv.textContainerInset = .zero               // no vertical inset so preview matches commit
         tv.insertionPointColor = state.color
         tv.delegate = self
         // Subtle dashed border so user can see the active text area
