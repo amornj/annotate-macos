@@ -162,7 +162,58 @@ final class ToolIndicatorView: NSView {
             circle.stroke()
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 11), .foregroundColor: color]
             NSString(string: "1").draw(at: CGPoint(x: rect.midX - 3, y: rect.midY - 7), withAttributes: attrs)
+
+        case .triangle:
+            color.setStroke()
+            path.lineWidth = 2
+            drawRegularPolygon(sides: 3, in: rect, path: path)
+            path.stroke()
+
+        case .pentagon:
+            color.setStroke()
+            path.lineWidth = 2
+            drawRegularPolygon(sides: 5, in: rect, path: path)
+            path.stroke()
+
+        case .hexagon:
+            color.setStroke()
+            path.lineWidth = 2
+            drawRegularPolygon(sides: 6, in: rect, path: path)
+            path.stroke()
+
+        case .octagon:
+            color.setStroke()
+            path.lineWidth = 2
+            drawRegularPolygon(sides: 8, in: rect, path: path)
+            path.stroke()
+
+        case .select:
+            // Dashed selection rectangle with top-left handle
+            let selRect = NSRect(x: rect.minX + 9, y: rect.minY + 9, width: rect.width - 18, height: rect.height - 18)
+            let selPath = NSBezierPath(rect: selRect)
+            selPath.lineWidth = 1.5
+            selPath.setLineDash([4, 2.5], count: 2, phase: 0)
+            color.withAlphaComponent(0.65).setStroke()
+            selPath.stroke()
+            // Handle at top-left (isFlipped=true, so minY is visual top)
+            let handleRect = NSRect(x: selRect.minX - 3, y: selRect.minY - 3, width: 7, height: 7)
+            color.setFill()
+            NSBezierPath(rect: handleRect).fill()
         }
+    }
+
+    private func drawRegularPolygon(sides: Int, in rect: NSRect, path: NSBezierPath) {
+        let cx = rect.midX, cy = rect.midY
+        let r = min(rect.width, rect.height) / 2 - 4
+        // Start vertex pointing upward (−π/2)
+        let startAngle = -CGFloat.pi / 2
+        let step = 2 * CGFloat.pi / CGFloat(sides)
+        for i in 0..<sides {
+            let a = startAngle + CGFloat(i) * step
+            let pt = NSPoint(x: cx + r * cos(a), y: cy + r * sin(a))
+            if i == 0 { path.move(to: pt) } else { path.line(to: pt) }
+        }
+        path.close()
     }
 
     override func mouseDown(with event: NSEvent) {

@@ -5,11 +5,14 @@ A lightweight, keyboard-driven screen annotation app for macOS. Press a hotkey t
 ## Features
 
 - Fullscreen transparent overlay over any app
+- Universal binary — runs natively on Apple Silicon and Intel
 - Draw, arrow, line, square, circle, text, callout tools
-- Whiteboard and blackboard background modes
+- Hold `Shift` while drawing a square or circle for a perfect square / circle
+- Whiteboard and blackboard background modes with a 40 pt grid
+- Snap-to-grid on move in select mode (hold `⌘` to bypass)
 - Multi-line text input with auto-expanding text box
-- Undo / redo
-- 6 colors, adjustable line width and font size
+- Undo / redo, copy / paste, multi-select, move / resize / rotate
+- 8 colors, adjustable line width and font size
 - Consistent code signing — screen recording permission persists across rebuilds
 
 ## Requirements
@@ -53,10 +56,15 @@ Open `AnnotateMac.xcodeproj` and run the `AnnotateMac` target.
 | `D` | Draw (freehand) |
 | `A` | Arrow |
 | `L` | Line |
-| `S` | Square |
-| `C` | Circle |
+| `S` | Square (hold `Shift` while dragging for a perfect square) |
+| `C` | Circle (hold `Shift` while dragging for a perfect circle) |
+| `T` | Triangle |
+| `P` | Pentagon |
+| `H` | Hexagon |
+| `O` | Octagon |
 | `F` | Text |
 | `N` | Numbered callout |
+| `V` | Select (move / resize / rotate, snaps to grid on whiteboard/blackboard — hold `⌘` to bypass) |
 | `W` | Whiteboard background |
 | `B` | Blackboard background |
 
@@ -79,6 +87,8 @@ Open `AnnotateMac.xcodeproj` and run the `AnnotateMac` target.
 | `4` | Yellow |
 | `5` | Light grey |
 | `6` | Dark grey |
+| `7` | Orange |
+| `8` | Purple |
 | `R` | Increase size |
 | `E` | Decrease size |
 
@@ -88,7 +98,9 @@ Open `AnnotateMac.xcodeproj` and run the `AnnotateMac` target.
 | `Cmd+Z` | Undo |
 | `Cmd+Y` / `Cmd+Shift+Z` | Redo |
 | `Cmd+A` | Select all |
-| `Delete` | Clear all (when select-all active) |
+| `Cmd+C` | Copy selected annotations (in select mode) |
+| `Cmd+V` | Paste at marked target point (or nearby) |
+| `Delete` | Delete selected, or clear all when select-all active |
 
 ### Exit
 | Key | Action |

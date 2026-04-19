@@ -6,6 +6,7 @@ mkdir -p dist
 # Build with Xcode automatic signing (team 47Y5Z32ZK3 = Apple Development cert)
 # This produces stable designated requirements so macOS TCC remembers screen recording permission.
 xcodebuild -project AnnotateMac.xcodeproj -scheme AnnotateMac -configuration Release \
+  ARCHS="x86_64 arm64" ONLY_ACTIVE_ARCH=NO \
   DEVELOPMENT_TEAM=47Y5Z32ZK3 \
   CODE_SIGN_STYLE=Automatic \
   "CODE_SIGN_IDENTITY=Apple Development" \
