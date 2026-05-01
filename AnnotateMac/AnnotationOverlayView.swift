@@ -308,13 +308,21 @@ final class AnnotationOverlayView: NSView {
         case let .line(x1, y1, x2, y2, color, lineWidth):
             color.setStroke(); ctx.setLineWidth(lineWidth); ctx.setLineCap(.round)
             ctx.beginPath(); ctx.move(to: CGPoint(x: x1, y: y1)); ctx.addLine(to: CGPoint(x: x2, y: y2)); ctx.strokePath()
-        case let .square(x1, y1, x2, y2, color, lineWidth):
+        case let .square(x1, y1, x2, y2, color, lineWidth, rotation):
             color.setStroke(); ctx.setLineWidth(lineWidth)
             let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            ctx.translateBy(x: center.x, y: center.y)
+            ctx.rotate(by: rotation)
+            ctx.translateBy(x: -center.x, y: -center.y)
             ctx.stroke(rect)
-        case let .circle(x1, y1, x2, y2, color, lineWidth):
+        case let .circle(x1, y1, x2, y2, color, lineWidth, rotation):
             color.setStroke(); ctx.setLineWidth(lineWidth)
             let rect = CGRect(x: min(x1, x2), y: min(y1, y2), width: abs(x2 - x1), height: abs(y2 - y1))
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            ctx.translateBy(x: center.x, y: center.y)
+            ctx.rotate(by: rotation)
+            ctx.translateBy(x: -center.x, y: -center.y)
             ctx.strokeEllipse(in: rect)
         case let .text(text, x, y, fontSize, color):
             let storage = NSTextStorage(string: text, attributes: [
@@ -383,8 +391,8 @@ final class AnnotationOverlayView: NSView {
         case .draw: break
         case .arrow: renderAction(.arrow(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
         case .line: renderAction(.line(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .square: renderAction(.square(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
-        case .circle: renderAction(.circle(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth), in: ctx)
+        case .square: renderAction(.square(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth, rotation: 0), in: ctx)
+        case .circle: renderAction(.circle(x1: start.x, y1: start.y, x2: end.x, y2: end.y, color: state.color, lineWidth: state.lineWidth, rotation: 0), in: ctx)
         case .triangle: renderAction(.polygon(cx: start.x, cy: start.y, vx: end.x, vy: end.y, sides: 3, color: state.color, lineWidth: state.lineWidth), in: ctx)
         case .pentagon: renderAction(.polygon(cx: start.x, cy: start.y, vx: end.x, vy: end.y, sides: 5, color: state.color, lineWidth: state.lineWidth), in: ctx)
         case .hexagon:  renderAction(.polygon(cx: start.x, cy: start.y, vx: end.x, vy: end.y, sides: 6, color: state.color, lineWidth: state.lineWidth), in: ctx)
@@ -529,10 +537,10 @@ final class AnnotationOverlayView: NSView {
             return .arrow(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth)
         case let .line(x1, y1, x2, y2, color, lineWidth):
             return .line(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth)
-        case let .square(x1, y1, x2, y2, color, lineWidth):
-            return .square(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth)
-        case let .circle(x1, y1, x2, y2, color, lineWidth):
-            return .circle(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth)
+        case let .square(x1, y1, x2, y2, color, lineWidth, rotation):
+            return .square(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth, rotation: rotation)
+        case let .circle(x1, y1, x2, y2, color, lineWidth, rotation):
+            return .circle(x1: x1+dx, y1: y1+dy, x2: x2+dx, y2: y2+dy, color: color, lineWidth: lineWidth, rotation: rotation)
         case let .text(text, x, y, fontSize, color):
             return .text(text: text, x: x+dx, y: y+dy, fontSize: fontSize, color: color)
         case let .callout(x, y, n, color, radius):
@@ -554,10 +562,10 @@ final class AnnotationOverlayView: NSView {
             return .arrow(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth)
         case let .line(x1, y1, x2, y2, color, lineWidth):
             return .line(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth)
-        case let .square(x1, y1, x2, y2, color, lineWidth):
-            return .square(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth)
-        case let .circle(x1, y1, x2, y2, color, lineWidth):
-            return .circle(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth)
+        case let .square(x1, y1, x2, y2, color, lineWidth, rotation):
+            return .square(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth, rotation: rotation)
+        case let .circle(x1, y1, x2, y2, color, lineWidth, rotation):
+            return .circle(x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), color: color, lineWidth: lineWidth, rotation: rotation)
         case let .text(text, x, y, fontSize, color):
             return .text(text: text, x: sx(x), y: sy(y), fontSize: max(6, fontSize * uniformScale), color: color)
         case let .callout(x, y, n, color, radius):
@@ -583,15 +591,14 @@ final class AnnotationOverlayView: NSView {
         case let .line(x1, y1, x2, y2, color, lineWidth):
             let p1 = rot(CGPoint(x: x1, y: y1)), p2 = rot(CGPoint(x: x2, y: y2))
             return .line(x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, color: color, lineWidth: lineWidth)
-        case let .square(x1, y1, x2, y2, color, lineWidth):
-            // Rotate the center; keep dimensions (rect stays axis-aligned)
+        case let .square(x1, y1, x2, y2, color, lineWidth, rotation):
             let c = rot(CGPoint(x: (x1+x2)/2, y: (y1+y2)/2))
             let hw = abs(x2-x1)/2, hh = abs(y2-y1)/2
-            return .square(x1: c.x-hw, y1: c.y-hh, x2: c.x+hw, y2: c.y+hh, color: color, lineWidth: lineWidth)
-        case let .circle(x1, y1, x2, y2, color, lineWidth):
+            return .square(x1: c.x-hw, y1: c.y-hh, x2: c.x+hw, y2: c.y+hh, color: color, lineWidth: lineWidth, rotation: rotation + angle)
+        case let .circle(x1, y1, x2, y2, color, lineWidth, rotation):
             let c = rot(CGPoint(x: (x1+x2)/2, y: (y1+y2)/2))
             let hw = abs(x2-x1)/2, hh = abs(y2-y1)/2
-            return .circle(x1: c.x-hw, y1: c.y-hh, x2: c.x+hw, y2: c.y+hh, color: color, lineWidth: lineWidth)
+            return .circle(x1: c.x-hw, y1: c.y-hh, x2: c.x+hw, y2: c.y+hh, color: color, lineWidth: lineWidth, rotation: rotation + angle)
         case let .text(text, x, y, fontSize, color):
             let p = rot(CGPoint(x: x, y: y))
             return .text(text: text, x: p.x, y: p.y, fontSize: fontSize, color: color)
@@ -851,8 +858,8 @@ final class AnnotationOverlayView: NSView {
             state.add(.draw(points: points, color: state.color, lineWidth: state.lineWidth))
         case .arrow:  state.add(.arrow(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
         case .line:   state.add(.line(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
-        case .square: state.add(.square(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
-        case .circle: state.add(.circle(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth))
+        case .square: state.add(.square(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth, rotation: 0))
+        case .circle: state.add(.circle(x1: start.x, y1: start.y, x2: location.x, y2: location.y, color: state.color, lineWidth: state.lineWidth, rotation: 0))
         case .triangle: state.add(.polygon(cx: start.x, cy: start.y, vx: location.x, vy: location.y, sides: 3, color: state.color, lineWidth: state.lineWidth))
         case .pentagon: state.add(.polygon(cx: start.x, cy: start.y, vx: location.x, vy: location.y, sides: 5, color: state.color, lineWidth: state.lineWidth))
         case .hexagon:  state.add(.polygon(cx: start.x, cy: start.y, vx: location.x, vy: location.y, sides: 6, color: state.color, lineWidth: state.lineWidth))

@@ -40,8 +40,8 @@ final class AnnotationState {
         case draw(points: [StrokePoint], color: NSColor, lineWidth: CGFloat)
         case arrow(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
         case line(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
-        case square(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
-        case circle(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat)
+        case square(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat, rotation: CGFloat)
+        case circle(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, color: NSColor, lineWidth: CGFloat, rotation: CGFloat)
         case text(text: String, x: CGFloat, y: CGFloat, fontSize: CGFloat, color: NSColor)
         case callout(x: CGFloat, y: CGFloat, n: Int, color: NSColor, radius: CGFloat)
         case polygon(cx: CGFloat, cy: CGFloat, vx: CGFloat, vy: CGFloat, sides: Int, color: NSColor, lineWidth: CGFloat)
@@ -171,12 +171,22 @@ final class AnnotationState {
         case let .line(x1, y1, x2, y2, _, lineWidth):
             let pad = lineWidth / 2 + 4
             return CGRect(x: min(x1,x2) - pad, y: min(y1,y2) - pad, width: abs(x2-x1) + pad*2, height: abs(y2-y1) + pad*2)
-        case let .square(x1, y1, x2, y2, _, lineWidth):
+        case let .square(x1, y1, x2, y2, _, lineWidth, rotation):
             let pad = lineWidth / 2
-            return CGRect(x: min(x1,x2) - pad, y: min(y1,y2) - pad, width: abs(x2-x1) + pad*2, height: abs(y2-y1) + pad*2)
-        case let .circle(x1, y1, x2, y2, _, lineWidth):
+            let cx = (x1 + x2) / 2, cy = (y1 + y2) / 2
+            let hw = abs(x2 - x1) / 2, hh = abs(y2 - y1) / 2
+            let cosR = abs(cos(rotation)), sinR = abs(sin(rotation))
+            let boundW = hw * cosR + hh * sinR
+            let boundH = hw * sinR + hh * cosR
+            return CGRect(x: cx - boundW - pad, y: cy - boundH - pad, width: boundW * 2 + pad * 2, height: boundH * 2 + pad * 2)
+        case let .circle(x1, y1, x2, y2, _, lineWidth, rotation):
             let pad = lineWidth / 2
-            return CGRect(x: min(x1,x2) - pad, y: min(y1,y2) - pad, width: abs(x2-x1) + pad*2, height: abs(y2-y1) + pad*2)
+            let cx = (x1 + x2) / 2, cy = (y1 + y2) / 2
+            let a = abs(x2 - x1) / 2, b = abs(y2 - y1) / 2
+            let cosR = cos(rotation), sinR = sin(rotation)
+            let boundW = sqrt(a * a * cosR * cosR + b * b * sinR * sinR)
+            let boundH = sqrt(a * a * sinR * sinR + b * b * cosR * cosR)
+            return CGRect(x: cx - boundW - pad, y: cy - boundH - pad, width: boundW * 2 + pad * 2, height: boundH * 2 + pad * 2)
         case let .text(text, x, y, fontSize, _):
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: fontSize)]
             let size = (text as NSString).boundingRect(
